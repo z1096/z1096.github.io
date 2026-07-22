@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Z1096 的个人项目主页，收集小游戏、实验工具和网页作品。"
+    />
+    <title>Z1096 Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="signal-canvas" aria-hidden="true"></canvas>
+
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Z1096 Lab 首页">
+        <span class="brand-mark">Z</span>
+        <span>Z1096 Lab</span>
+      </a>
+      <nav class="nav-links" aria-label="主导航">
+        <a href="#projects">项目</a>
+        <a href="https://github.com/z1096" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Personal Game & Web Lab</p>
+          <h1 id="hero-title">Z1096 Lab</h1>
+          <p class="hero-summary">
+            一个放小游戏、网页实验和实用工具的入口页。
+          </p>
+          <div class="hero-actions" aria-label="快捷入口">
+            <a class="button primary" href="#projects">查看项目</a>
+            <a class="button" href="https://github.com/z1096" rel="noreferrer">GitHub</a>
+          </div>
+        </div>
+
+        <aside class="hero-status" aria-label="主页状态">
+          <div>
+            <span class="status-label">Live</span>
+            <strong>GitHub Pages</strong>
+          </div>
+          <div>
+            <span class="status-label">Focus</span>
+            <strong>Games</strong>
+          </div>
+          <div>
+            <span class="status-label">Stack</span>
+            <strong>Static Web</strong>
+          </div>
+        </aside>
+      </section>
+
+      <section class="projects-section" id="projects" aria-labelledby="projects-title">
+        <div class="section-heading">
+          <p class="eyebrow">Projects</p>
+          <h2 id="projects-title">作品入口</h2>
+        </div>
+
+        <div class="project-grid">
+          <article class="project-card featured">
+            <div class="project-visual" aria-hidden="true">
+              <span class="potato-shape"></span>
+              <span class="pulse-ring"></span>
+              <span class="spark spark-one"></span>
+              <span class="spark spark-two"></span>
+              <span class="spark spark-three"></span>
+            </div>
+            <div class="project-content">
+              <p class="project-kind">Survivor Game</p>
+              <h3>Spud Survivor</h3>
+              <p>
+                俯视角自动射击生存小游戏，已拆成 TypeScript 模块并发布到 GitHub Pages。
+              </p>
+              <div class="project-actions">
+                <a class="button small primary" href="https://z1096.github.io/spud-survivor/">打开</a>
+                <a class="button small" href="https://github.com/z1096/spud-survivor" rel="noreferrer">代码</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="project-card muted">
+            <div class="project-content">
+              <p class="project-kind">Coming Next</p>
+              <h3>更多小游戏</h3>
+              <p>新的静态网页项目可以继续挂在这个主页下面。</p>
+            </div>
+          </article>
+
+          <article class="project-card muted">
+            <div class="project-content">
+              <p class="project-kind">Tools</p>
+              <h3>工具实验</h3>
+              <p>适合放可视化、小工具、原型验证和学习项目。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>© 2026 Z1096</span>
+      <a href="https://github.com/z1096/z1096.github.io" rel="noreferrer">Homepage Repo</a>
+    </footer>
+
+    <script src="./main.js" type="module"></script>
+  </body>
+</html>
