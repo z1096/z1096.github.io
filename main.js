@@ -3,6 +3,7 @@ const ctx = canvas.getContext("2d");
 const pointer = { x: 0.5, y: 0.42, active: false };
 const stars = [];
 const sparks = [];
+const filaments = [];
 const sinkSelectors = [
   ".brand",
   ".nav-links",
@@ -36,9 +37,24 @@ function makeStar(radiusMultiplier = 1) {
     spin: 0.00005 + Math.random() * 0.00018,
     size: 0.7 + Math.random() * 2.2,
     alpha: 0.38 + Math.random() * 0.62,
-    hue: Math.random() > 0.58 ? "126, 215, 255" : Math.random() > 0.5 ? "255, 202, 106" : "185, 140, 255",
+    hue: Math.random() > 0.7 ? "255, 226, 150" : Math.random() > 0.46 ? "255, 101, 24" : "170, 20, 8",
     stretch: 0.48 + Math.random() * 0.2,
     wobble: Math.random() * Math.PI * 2,
+  };
+}
+
+function makeFilament(index) {
+  const band = index / 34;
+  return {
+    start: Math.PI * (0.56 + Math.random() * 0.24),
+    length: Math.PI * (0.78 + Math.random() * 0.82),
+    radiusX: 185 + band * 420 + Math.random() * 44,
+    radiusY: 76 + band * 174 + Math.random() * 22,
+    width: 1.2 + Math.random() * 5.8 + (1 - band) * 2.8,
+    alpha: 0.16 + Math.random() * 0.48,
+    speed: (Math.random() > 0.35 ? 1 : -1) * (0.00014 + Math.random() * 0.00034),
+    phase: Math.random() * Math.PI * 2,
+    heat: Math.random(),
   };
 }
 
@@ -58,13 +74,18 @@ function resetCanvas() {
   for (let index = 0; index < count; index += 1) {
     stars.push(makeStar());
   }
+
+  filaments.length = 0;
+  for (let index = 0; index < 34; index += 1) {
+    filaments.push(makeFilament(index));
+  }
 }
 
 function drawSpace(center, time) {
   const wash = ctx.createRadialGradient(center.x, center.y, 20, center.x, center.y, Math.max(width, height) * 0.86);
   wash.addColorStop(0, "rgba(0, 0, 0, 0.98)");
-  wash.addColorStop(0.24, "rgba(14, 9, 20, 0.72)");
-  wash.addColorStop(0.58, "rgba(4, 4, 10, 0.86)");
+  wash.addColorStop(0.22, "rgba(28, 5, 2, 0.64)");
+  wash.addColorStop(0.5, "rgba(8, 2, 4, 0.88)");
   wash.addColorStop(1, "rgba(3, 3, 5, 1)");
 
   ctx.fillStyle = wash;
@@ -123,47 +144,87 @@ function drawStars(center, delta, time, pull) {
 
 function drawAccretionDisk(center, time, pull) {
   const diskScale = Math.min(width, height) / 760;
-  const diskWidth = Math.max(280, 540 * diskScale);
-  const diskHeight = Math.max(92, 166 * diskScale);
+  const diskWidth = Math.max(330, 680 * diskScale);
+  const diskHeight = Math.max(118, 236 * diskScale);
 
   ctx.save();
   ctx.translate(center.x, center.y);
-  ctx.rotate(-0.12 + Math.sin(time * 0.00024) * 0.025);
-  ctx.scale(1, 0.38);
+  ctx.rotate(-0.18 + Math.sin(time * 0.00024) * 0.025);
+  ctx.scale(1, 0.48);
   ctx.lineCap = "round";
+  ctx.globalCompositeOperation = "lighter";
 
-  const glow = 28 + pull * 36;
-  ctx.shadowBlur = glow;
-  ctx.shadowColor = "rgba(255, 202, 106, 0.88)";
-  ctx.lineWidth = 38 + pull * 20;
-  ctx.strokeStyle = "rgba(255, 202, 106, 0.25)";
+  const flameGradient = ctx.createLinearGradient(-diskWidth * 0.58, 0, diskWidth * 0.46, 0);
+  flameGradient.addColorStop(0, `rgba(255, 255, 236, ${0.9 + pull * 0.08})`);
+  flameGradient.addColorStop(0.18, `rgba(255, 221, 92, ${0.78 + pull * 0.16})`);
+  flameGradient.addColorStop(0.44, `rgba(255, 89, 18, ${0.54 + pull * 0.18})`);
+  flameGradient.addColorStop(0.72, `rgba(150, 18, 8, ${0.26 + pull * 0.18})`);
+  flameGradient.addColorStop(1, "rgba(48, 0, 0, 0)");
+
+  ctx.shadowBlur = 54 + pull * 62;
+  ctx.shadowColor = "rgba(255, 126, 16, 0.92)";
+  ctx.lineWidth = 42 + pull * 34;
+  ctx.strokeStyle = flameGradient;
   ctx.beginPath();
-  ctx.ellipse(0, 0, diskWidth * 0.42, diskHeight * 0.62, 0, Math.PI * 0.08, Math.PI * 1.08);
+  ctx.ellipse(0, 0, diskWidth * 0.45, diskHeight * 0.72, 0, Math.PI * 0.68, Math.PI * 1.42);
   ctx.stroke();
 
-  ctx.shadowColor = "rgba(255, 107, 159, 0.78)";
-  ctx.lineWidth = 22 + pull * 16;
-  ctx.strokeStyle = "rgba(255, 107, 159, 0.46)";
+  ctx.shadowBlur = 30 + pull * 30;
+  ctx.lineWidth = 24 + pull * 22;
+  ctx.strokeStyle = "rgba(255, 246, 196, 0.76)";
   ctx.beginPath();
-  ctx.ellipse(0, 0, diskWidth * 0.46, diskHeight * 0.72, 0, Math.PI * 1.02, Math.PI * 1.94);
+  ctx.ellipse(-diskWidth * 0.05, -diskHeight * 0.03, diskWidth * 0.34, diskHeight * 0.58, 0, Math.PI * 0.78, Math.PI * 1.34);
   ctx.stroke();
 
-  ctx.shadowColor = "rgba(126, 215, 255, 0.8)";
-  ctx.lineWidth = 14 + pull * 12;
-  ctx.strokeStyle = "rgba(126, 215, 255, 0.58)";
-  ctx.beginPath();
-  ctx.ellipse(0, 0, diskWidth * 0.52, diskHeight * 0.84, 0, Math.PI * 1.96, Math.PI * 2.42);
-  ctx.stroke();
+  filaments.forEach((filament, index) => {
+    const spin = time * filament.speed * (1 + pull * 5.5) + filament.phase;
+    const arcStart = filament.start + spin;
+    const arcEnd = arcStart + filament.length * (1 + pull * 0.48);
+    const orbitGradient = ctx.createLinearGradient(-filament.radiusX, 0, filament.radiusX, 0);
+    const hot = filament.heat > 0.54;
+    const alpha = Math.min(0.95, filament.alpha + pull * 0.34);
+
+    orbitGradient.addColorStop(0, hot ? `rgba(255, 247, 212, ${alpha})` : `rgba(255, 176, 44, ${alpha * 0.85})`);
+    orbitGradient.addColorStop(0.22, `rgba(255, 102, 15, ${alpha})`);
+    orbitGradient.addColorStop(0.54, `rgba(176, 26, 8, ${alpha * 0.58})`);
+    orbitGradient.addColorStop(0.82, `rgba(86, 2, 2, ${alpha * 0.32})`);
+    orbitGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+    ctx.shadowBlur = 12 + filament.width * 6 + pull * 24;
+    ctx.shadowColor = hot ? "rgba(255, 212, 76, 0.84)" : "rgba(255, 58, 12, 0.72)";
+    ctx.lineWidth = filament.width * (1 + pull * 1.15);
+    ctx.strokeStyle = orbitGradient;
+    ctx.beginPath();
+    ctx.ellipse(
+      Math.sin(index * 1.7 + time * 0.00031) * 8,
+      Math.cos(index * 1.3 + time * 0.00027) * 8,
+      filament.radiusX * (0.58 + diskScale * 0.48),
+      filament.radiusY * (0.62 + diskScale * 0.42),
+      0,
+      arcStart,
+      arcEnd,
+    );
+    ctx.stroke();
+  });
 
   ctx.restore();
 
   ctx.save();
   ctx.translate(center.x, center.y);
-  ctx.rotate(time * 0.00032);
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.08 + pull * 0.12})`;
-  ctx.lineWidth = 1.2;
+  ctx.rotate(-0.18 + time * 0.00042);
+  ctx.scale(1, 0.48);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = `rgba(255, 221, 96, ${0.16 + pull * 0.24})`;
+  ctx.shadowBlur = 18 + pull * 22;
+  ctx.shadowColor = "rgba(255, 90, 16, 0.76)";
+  ctx.lineWidth = 2.4 + pull * 2.2;
   ctx.beginPath();
-  ctx.ellipse(0, 0, diskWidth * 0.32, diskHeight * 0.24, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, diskWidth * 0.34, diskHeight * 0.31, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(255, 50, 20, ${0.18 + pull * 0.22})`;
+  ctx.lineWidth = 1.1 + pull * 1.4;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, diskWidth * 0.52, diskHeight * 0.5, 0, Math.PI * 1.66, Math.PI * 2.54);
   ctx.stroke();
   ctx.restore();
 }
@@ -173,8 +234,9 @@ function drawEventHorizon(center, time, pull) {
   const inner = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radius * 2.1);
   inner.addColorStop(0, "rgba(0, 0, 0, 1)");
   inner.addColorStop(0.48, "rgba(0, 0, 0, 1)");
-  inner.addColorStop(0.62, `rgba(126, 215, 255, ${0.22 + pull * 0.32})`);
-  inner.addColorStop(0.74, `rgba(255, 202, 106, ${0.18 + pull * 0.28})`);
+  inner.addColorStop(0.61, `rgba(255, 234, 173, ${0.22 + pull * 0.24})`);
+  inner.addColorStop(0.72, `rgba(255, 80, 12, ${0.28 + pull * 0.32})`);
+  inner.addColorStop(0.86, `rgba(105, 8, 4, ${0.24 + pull * 0.24})`);
   inner.addColorStop(1, "rgba(0, 0, 0, 0)");
 
   ctx.fillStyle = inner;
@@ -184,19 +246,22 @@ function drawEventHorizon(center, time, pull) {
 
   ctx.save();
   ctx.translate(center.x, center.y);
-  ctx.rotate(time * 0.0013);
-  ctx.strokeStyle = `rgba(126, 215, 255, ${0.4 + pull * 0.32})`;
-  ctx.shadowBlur = 28 + pull * 42;
-  ctx.shadowColor = "rgba(126, 215, 255, 0.9)";
-  ctx.lineWidth = 2 + pull * 2.5;
+  ctx.rotate(-0.16 + time * 0.0013);
+  ctx.scale(1, 0.52);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = `rgba(255, 235, 184, ${0.54 + pull * 0.34})`;
+  ctx.shadowBlur = 34 + pull * 48;
+  ctx.shadowColor = "rgba(255, 182, 42, 0.92)";
+  ctx.lineWidth = 3 + pull * 3.4;
   ctx.beginPath();
-  ctx.arc(0, 0, radius * (1.11 + pull * 0.08), Math.PI * 0.08, Math.PI * 1.48);
+  ctx.ellipse(0, 0, radius * (1.2 + pull * 0.12), radius * (0.72 + pull * 0.08), 0, Math.PI * 0.7, Math.PI * 1.46);
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(255, 202, 106, ${0.42 + pull * 0.36})`;
-  ctx.shadowColor = "rgba(255, 202, 106, 0.86)";
+  ctx.strokeStyle = `rgba(255, 70, 18, ${0.44 + pull * 0.38})`;
+  ctx.shadowColor = "rgba(255, 54, 8, 0.86)";
+  ctx.lineWidth = 2.2 + pull * 2.8;
   ctx.beginPath();
-  ctx.arc(0, 0, radius * (1.2 + pull * 0.1), Math.PI * 1.56, Math.PI * 2.22);
+  ctx.ellipse(0, 0, radius * (1.36 + pull * 0.16), radius * (0.82 + pull * 0.1), 0, Math.PI * 1.48, Math.PI * 2.28);
   ctx.stroke();
   ctx.restore();
 
