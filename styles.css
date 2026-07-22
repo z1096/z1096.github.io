@@ -82,7 +82,7 @@ a {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
 }
 
 .site-header {
@@ -97,6 +97,13 @@ a {
   margin: 0 auto;
   padding: 18px 0;
   backdrop-filter: blur(18px);
+}
+
+.site-header,
+main,
+.site-footer {
+  position: relative;
+  z-index: 1;
 }
 
 .brand,
@@ -475,7 +482,10 @@ h1 {
 }
 
 .sinkable {
+  backface-visibility: hidden;
   transform-origin: center;
+  transform-style: preserve-3d;
+  will-change: transform, opacity, filter;
 }
 
 body.absorbing {
@@ -483,35 +493,64 @@ body.absorbing {
 }
 
 body.absorbing .sinkable {
-  animation: sink-into-hole 1.55s cubic-bezier(0.55, 0, 0.16, 1) var(--sink-delay, 0ms) forwards;
+  animation: sink-into-hole 1.95s cubic-bezier(0.22, 0.86, 0.18, 1) var(--sink-delay, 0ms) forwards;
   pointer-events: none;
 }
 
 body.absorbing #signal-canvas {
-  z-index: 20;
+  z-index: 0;
 }
 
 @keyframes sink-into-hole {
   0% {
     opacity: 1;
     filter: blur(0) brightness(1);
-    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    transform: translate3d(0, 0, 0) rotate(0deg) rotateX(0deg) scale(1);
   }
-  58% {
-    opacity: 0.88;
-    filter: blur(0.5px) brightness(1.35);
+  16% {
+    opacity: 1;
+    filter: blur(0) brightness(1.06);
     transform:
-      translate3d(calc(var(--sink-x) * 0.68), calc(var(--sink-y) * 0.68), 0)
-      rotate(calc(var(--sink-rotate) * 0.58))
-      scale(0.52);
+      translate3d(var(--sink-pre-x), var(--sink-pre-y), 0)
+      rotate(var(--sink-rotate-pre))
+      rotateX(var(--sink-tilt))
+      scale(1.026);
+  }
+  44% {
+    opacity: 0.96;
+    filter: blur(0.15px) brightness(1.16);
+    transform:
+      translate3d(var(--sink-mid-x), var(--sink-mid-y), 0)
+      rotate(var(--sink-rotate-mid))
+      rotateX(var(--sink-tilt-mid))
+      scale(0.72);
+  }
+  72% {
+    opacity: 0.76;
+    filter: blur(0.8px) brightness(1.48);
+    transform:
+      translate3d(var(--sink-near-x), var(--sink-near-y), 0)
+      rotate(var(--sink-rotate-near))
+      rotateX(var(--sink-tilt-near))
+      scale(0.28);
+  }
+  90% {
+    opacity: 0.32;
+    filter: blur(3.8px) brightness(1.9);
+    transform:
+      translate3d(var(--sink-x), var(--sink-y), 0)
+      rotate(var(--sink-rotate-late))
+      rotateX(0deg)
+      scale(0.075);
   }
   100% {
     opacity: 0;
-    filter: blur(9px) brightness(2.1);
+    filter: blur(10px) brightness(2.4);
     transform:
       translate3d(var(--sink-x), var(--sink-y), 0)
       rotate(var(--sink-rotate))
-      scale(0.02);
+      rotateX(0deg)
+      scale(0.004);
   }
 }
 

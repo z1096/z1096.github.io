@@ -44,17 +44,19 @@ function makeStar(radiusMultiplier = 1) {
 }
 
 function makeFilament(index) {
-  const band = index / 34;
+  const band = index / 72;
+  const inner = band < 0.38;
   return {
-    start: Math.PI * (0.56 + Math.random() * 0.24),
-    length: Math.PI * (0.78 + Math.random() * 0.82),
-    radiusX: 185 + band * 420 + Math.random() * 44,
-    radiusY: 76 + band * 174 + Math.random() * 22,
-    width: 1.2 + Math.random() * 5.8 + (1 - band) * 2.8,
-    alpha: 0.16 + Math.random() * 0.48,
-    speed: (Math.random() > 0.35 ? 1 : -1) * (0.00014 + Math.random() * 0.00034),
+    start: Math.PI * (0.52 + Math.random() * 0.3),
+    length: Math.PI * (0.46 + Math.random() * 0.92),
+    radiusX: 160 + band * 480 + Math.random() * 28,
+    radiusY: 68 + band * 192 + Math.random() * 18,
+    width: (inner ? 0.42 : 0.28) + Math.random() * (inner ? 1.55 : 1.15),
+    alpha: 0.1 + Math.random() * (inner ? 0.38 : 0.28),
+    speed: (Math.random() > 0.28 ? 1 : -1) * (0.00012 + Math.random() * 0.00028),
     phase: Math.random() * Math.PI * 2,
     heat: Math.random(),
+    shimmer: 0.6 + Math.random() * 0.8,
   };
 }
 
@@ -76,7 +78,7 @@ function resetCanvas() {
   }
 
   filaments.length = 0;
-  for (let index = 0; index < 34; index += 1) {
+  for (let index = 0; index < 72; index += 1) {
     filaments.push(makeFilament(index));
   }
 }
@@ -161,20 +163,32 @@ function drawAccretionDisk(center, time, pull) {
   flameGradient.addColorStop(0.72, `rgba(150, 18, 8, ${0.26 + pull * 0.18})`);
   flameGradient.addColorStop(1, "rgba(48, 0, 0, 0)");
 
-  ctx.shadowBlur = 54 + pull * 62;
+  ctx.shadowBlur = 44 + pull * 54;
   ctx.shadowColor = "rgba(255, 126, 16, 0.92)";
-  ctx.lineWidth = 42 + pull * 34;
+  ctx.lineWidth = 30 + pull * 26;
   ctx.strokeStyle = flameGradient;
   ctx.beginPath();
   ctx.ellipse(0, 0, diskWidth * 0.45, diskHeight * 0.72, 0, Math.PI * 0.68, Math.PI * 1.42);
   ctx.stroke();
 
-  ctx.shadowBlur = 30 + pull * 30;
-  ctx.lineWidth = 24 + pull * 22;
-  ctx.strokeStyle = "rgba(255, 246, 196, 0.76)";
-  ctx.beginPath();
-  ctx.ellipse(-diskWidth * 0.05, -diskHeight * 0.03, diskWidth * 0.34, diskHeight * 0.58, 0, Math.PI * 0.78, Math.PI * 1.34);
-  ctx.stroke();
+  for (let layer = 0; layer < 9; layer += 1) {
+    const layerShift = layer * 0.018;
+    ctx.shadowBlur = 15 + pull * 26;
+    ctx.shadowColor = "rgba(255, 232, 168, 0.72)";
+    ctx.lineWidth = Math.max(1, 8.4 - layer * 0.68 + pull * 7);
+    ctx.strokeStyle = `rgba(255, ${236 - layer * 14}, ${190 - layer * 16}, ${0.52 - layer * 0.035 + pull * 0.18})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      -diskWidth * (0.055 + layerShift),
+      -diskHeight * (0.025 + layerShift * 0.55),
+      diskWidth * (0.34 + layer * 0.014),
+      diskHeight * (0.56 + layer * 0.018),
+      0,
+      Math.PI * (0.78 + layer * 0.006),
+      Math.PI * (1.31 + layer * 0.01),
+    );
+    ctx.stroke();
+  }
 
   filaments.forEach((filament, index) => {
     const spin = time * filament.speed * (1 + pull * 5.5) + filament.phase;
@@ -182,7 +196,8 @@ function drawAccretionDisk(center, time, pull) {
     const arcEnd = arcStart + filament.length * (1 + pull * 0.48);
     const orbitGradient = ctx.createLinearGradient(-filament.radiusX, 0, filament.radiusX, 0);
     const hot = filament.heat > 0.54;
-    const alpha = Math.min(0.95, filament.alpha + pull * 0.34);
+    const shimmer = 0.72 + Math.sin(time * 0.0022 * filament.shimmer + filament.phase) * 0.28;
+    const alpha = Math.min(0.9, (filament.alpha + pull * 0.26) * shimmer);
 
     orbitGradient.addColorStop(0, hot ? `rgba(255, 247, 212, ${alpha})` : `rgba(255, 176, 44, ${alpha * 0.85})`);
     orbitGradient.addColorStop(0.22, `rgba(255, 102, 15, ${alpha})`);
@@ -190,9 +205,9 @@ function drawAccretionDisk(center, time, pull) {
     orbitGradient.addColorStop(0.82, `rgba(86, 2, 2, ${alpha * 0.32})`);
     orbitGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
 
-    ctx.shadowBlur = 12 + filament.width * 6 + pull * 24;
+    ctx.shadowBlur = 7 + filament.width * 5 + pull * 18;
     ctx.shadowColor = hot ? "rgba(255, 212, 76, 0.84)" : "rgba(255, 58, 12, 0.72)";
-    ctx.lineWidth = filament.width * (1 + pull * 1.15);
+    ctx.lineWidth = filament.width * (1 + pull * 0.85);
     ctx.strokeStyle = orbitGradient;
     ctx.beginPath();
     ctx.ellipse(
@@ -343,9 +358,22 @@ function resetAbsorption() {
   absorbing = false;
   document.body.classList.remove("absorbing");
   document.querySelectorAll(".sinkable").forEach((element) => {
+    element.style.removeProperty("--sink-pre-x");
+    element.style.removeProperty("--sink-pre-y");
+    element.style.removeProperty("--sink-mid-x");
+    element.style.removeProperty("--sink-mid-y");
+    element.style.removeProperty("--sink-near-x");
+    element.style.removeProperty("--sink-near-y");
     element.style.removeProperty("--sink-x");
     element.style.removeProperty("--sink-y");
+    element.style.removeProperty("--sink-rotate-pre");
+    element.style.removeProperty("--sink-rotate-mid");
+    element.style.removeProperty("--sink-rotate-near");
+    element.style.removeProperty("--sink-rotate-late");
     element.style.removeProperty("--sink-rotate");
+    element.style.removeProperty("--sink-tilt-mid");
+    element.style.removeProperty("--sink-tilt-near");
+    element.style.removeProperty("--sink-tilt");
     element.style.removeProperty("--sink-delay");
   });
 }
@@ -357,14 +385,33 @@ function markSinkTargets(center) {
     const rect = element.getBoundingClientRect();
     const elementCenterX = rect.left + rect.width / 2;
     const elementCenterY = rect.top + rect.height / 2;
-    const distance = Math.hypot(center.x - elementCenterX, center.y - elementCenterY);
-    const delay = Math.min(300, index * 22 + Math.random() * 70);
-    const spin = (distance > 420 ? 1 : -1) * (300 + Math.random() * 680);
+    const dx = center.x - elementCenterX;
+    const dy = center.y - elementCenterY;
+    const distance = Math.hypot(dx, dy);
+    const side = elementCenterX < center.x ? -1 : 1;
+    const curve = side * Math.min(150, 32 + distance * 0.1);
+    const lift = Math.min(70, 18 + distance * 0.04);
+    const delay = Math.min(220, index * 12 + distance * 0.08);
+    const spin = side * (108 + Math.random() * 168);
+    const tilt = side * (6 + Math.random() * 10);
 
     element.classList.add("sinkable");
-    element.style.setProperty("--sink-x", `${center.x - elementCenterX}px`);
-    element.style.setProperty("--sink-y", `${center.y - elementCenterY}px`);
+    element.style.setProperty("--sink-pre-x", `${-dx * 0.035}px`);
+    element.style.setProperty("--sink-pre-y", `${-dy * 0.025 - 8}px`);
+    element.style.setProperty("--sink-mid-x", `${dx * 0.42 + curve}px`);
+    element.style.setProperty("--sink-mid-y", `${dy * 0.38 - lift}px`);
+    element.style.setProperty("--sink-near-x", `${dx * 0.82 + curve * 0.24}px`);
+    element.style.setProperty("--sink-near-y", `${dy * 0.78 - lift * 0.24}px`);
+    element.style.setProperty("--sink-x", `${dx}px`);
+    element.style.setProperty("--sink-y", `${dy}px`);
+    element.style.setProperty("--sink-rotate-pre", `${spin * -0.035}deg`);
+    element.style.setProperty("--sink-rotate-mid", `${spin * 0.22}deg`);
+    element.style.setProperty("--sink-rotate-near", `${spin * 0.64}deg`);
+    element.style.setProperty("--sink-rotate-late", `${spin * 0.9}deg`);
     element.style.setProperty("--sink-rotate", `${spin}deg`);
+    element.style.setProperty("--sink-tilt-mid", `${tilt * 0.62}deg`);
+    element.style.setProperty("--sink-tilt-near", `${tilt * -0.35}deg`);
+    element.style.setProperty("--sink-tilt", `${tilt}deg`);
     element.style.setProperty("--sink-delay", `${delay}ms`);
   });
 }
@@ -381,11 +428,11 @@ function triggerAbsorption(after) {
   document.body.classList.add("absorbing");
 
   if (after) {
-    resetTimer = window.setTimeout(after, 1580);
+    resetTimer = window.setTimeout(after, 2050);
     return;
   }
 
-  resetTimer = window.setTimeout(resetAbsorption, 2350);
+  resetTimer = window.setTimeout(resetAbsorption, 3000);
 }
 
 function navigateAfterAbsorption(link) {
