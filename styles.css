@@ -1,5 +1,7 @@
 :root {
   color-scheme: dark;
+  --hole-x: 64%;
+  --hole-y: 40%;
   --bg: #030305;
   --panel: rgba(10, 10, 17, 0.58);
   --panel-strong: rgba(14, 13, 22, 0.74);
@@ -29,7 +31,7 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 50% 38%, rgba(0, 0, 0, 0) 0 13rem, rgba(3, 3, 5, 0.2) 23rem, #030305 52rem),
+    radial-gradient(circle at var(--hole-x) var(--hole-y), rgba(0, 0, 0, 0) 0 11rem, rgba(3, 3, 5, 0.24) 24rem, #030305 54rem),
     linear-gradient(180deg, #06050b 0%, #030305 52%, #050408 100%);
   color: var(--text);
   letter-spacing: 0;
@@ -47,7 +49,7 @@ body::after {
 body::before {
   background:
     conic-gradient(
-      from 168deg at 50% 42%,
+      from 168deg at var(--hole-x) var(--hole-y),
       transparent 0deg,
       rgba(255, 197, 90, 0.18) 58deg,
       transparent 112deg,
@@ -64,8 +66,8 @@ body::before {
 
 body::after {
   background:
-    radial-gradient(circle at 50% 42%, transparent 0 12rem, rgba(255, 216, 132, 0.1) 13.5rem, transparent 19rem),
-    radial-gradient(circle at 50% 42%, transparent 0 18rem, rgba(255, 67, 12, 0.12) 19.5rem, transparent 31rem);
+    radial-gradient(circle at var(--hole-x) var(--hole-y), transparent 0 11rem, rgba(255, 216, 132, 0.11) 12.5rem, transparent 19rem),
+    radial-gradient(circle at var(--hole-x) var(--hole-y), transparent 0 17rem, rgba(255, 67, 12, 0.12) 19rem, transparent 32rem);
   opacity: 0.86;
   mix-blend-mode: screen;
   animation: gravity-breathe 6s ease-in-out infinite;
@@ -492,6 +494,10 @@ body.absorbing {
   cursor: progress;
 }
 
+body.absorbing .site-header {
+  backdrop-filter: none;
+}
+
 body.absorbing .sinkable {
   animation: sink-into-hole 1.95s cubic-bezier(0.22, 0.86, 0.18, 1) var(--sink-delay, 0ms) forwards;
   pointer-events: none;
@@ -638,6 +644,11 @@ body.absorbing #signal-canvas {
 }
 
 @media (max-width: 560px) {
+  :root {
+    --hole-x: 62%;
+    --hole-y: 29%;
+  }
+
   .nav-links {
     width: 100%;
     justify-content: space-between;
