@@ -14,6 +14,18 @@ python3 -m http.server 4173 --bind 127.0.0.1
 
 Then open `http://127.0.0.1:4173/`.
 
+## Tech
+
+- Static HTML/CSS/JavaScript
+- Three.js/WebGL for the animated 3D black hole background
+- CSS transforms for the click-to-absorb page module animation
+
+## Check
+
+```bash
+npm run check
+```
+
 ## Deploy
 
 Push the `main` branch to GitHub and enable Pages from:
@@ -22,4 +34,4 @@ Push the `main` branch to GitHub and enable Pages from:
 - Branch: `main`
 - Folder: `/ (root)`
 
-The project is static and has no build step.
+The project is static and has no build step. The browser loads the vendored Three.js module from `vendor/`.

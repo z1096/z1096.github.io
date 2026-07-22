@@ -1,0 +1,9 @@
+{
+  "type": "module",
+  "scripts": {
+    "check": "node --check main.js && node --check black-hole-3d.js"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  }
+}
