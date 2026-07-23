@@ -25,24 +25,26 @@ const DISK_VERTEX_SHADER = `
   const float TAU = 6.28318530718;
 
   void main() {
-    float cycle = fract(aPhase + uTime * aSpeed * (0.012 + uAbsorb * 0.09));
-    float pull = smoothstep(0.08, 0.96, cycle) * uAbsorb;
-    float radius = mix(aRadius, max(1.76, aRadius * 0.18), pull);
-    float angularVelocity = (0.15 + 1.35 / (radius + 1.1)) * aSpeed;
-    float angle = aAngle + uTime * angularVelocity * (1.0 + uAbsorb * 5.4) + pull * 6.2;
+    float cycle = fract(aPhase + uTime * aSpeed * (0.018 + uAbsorb * 0.11));
+    float inward = pow(smoothstep(0.0, 1.0, cycle), 1.28);
+    float radius = mix(aRadius, 1.54, inward);
+    float angularVelocity = (0.15 + 1.5 / (radius + 0.9)) * aSpeed;
+    float angle = aAngle
+      - uTime * angularVelocity * (1.0 + uAbsorb * 4.8)
+      - inward * (2.8 + uAbsorb * 4.0);
     float turbulence = sin(angle * 3.0 + aPhase * TAU) * (0.028 + aLayer * 0.07);
-    float height = aHeight * (1.0 - pull * 0.72) + turbulence;
+    float height = aHeight * (1.0 - inward * 0.9) + turbulence * (1.0 - inward);
     vec3 transformed = vec3(cos(angle) * radius, sin(angle) * radius, height);
     vec4 viewPosition = modelViewMatrix * vec4(transformed, 1.0);
     gl_Position = projectionMatrix * viewPosition;
     gl_PointSize = aSize * uSizeScale * (90.0 / max(2.0, -viewPosition.z)) * (1.0 + uAbsorb * 0.46);
 
-    float tangentX = -sin(angle);
-    float tangentY = cos(angle) * 0.52;
+    float tangentX = sin(angle);
+    float tangentY = -cos(angle) * 0.52;
     vSpriteAngle = atan(tangentY, tangentX) - 0.12;
-    vHeat = aHeat;
+    vHeat = min(1.0, aHeat + inward * 0.25);
     vAlpha = (0.38 + aHeat * 0.62) * (0.76 + 0.24 * sin(uTime * (1.1 + aSpeed) + aPhase * 31.0));
-    vAlpha *= 1.0 - pull * 0.38;
+    vAlpha *= smoothstep(0.0, 0.08, cycle) * (1.0 - smoothstep(0.84, 1.0, cycle));
   }
 `;
 
@@ -62,8 +64,8 @@ const RING_VERTEX_SHADER = `
 
   void main() {
     float pulse = sin(uTime * (0.5 + aSpeed) + aPhase * 23.0);
-    float radius = aRadius + pulse * 0.018 + uAbsorb * 0.08;
-    float angle = aAngle + uTime * aSpeed * (0.18 + uAbsorb * 1.4);
+    float radius = aRadius + pulse * 0.018 - uAbsorb * 0.055;
+    float angle = aAngle - uTime * aSpeed * (0.18 + uAbsorb * 1.4);
     vec3 transformed = vec3(cos(angle) * radius, sin(angle) * radius * 1.045, 0.34);
     vec4 viewPosition = modelViewMatrix * vec4(transformed, 1.0);
     gl_Position = projectionMatrix * viewPosition;
@@ -370,7 +372,7 @@ class ParticleBlackHoleScene {
     const pointerY = this.pointerActive ? (0.5 - this.pointer.y) * 0.08 : 0;
     this.root.rotation.y = THREE.MathUtils.damp(this.root.rotation.y, pointerX, 2.7, delta);
     this.root.rotation.x = THREE.MathUtils.damp(this.root.rotation.x, pointerY, 2.7, delta);
-    this.disk.rotation.z = -0.12 + this.elapsed * (0.018 + this.absorbStrength * 0.18);
+    this.disk.rotation.z = -0.12 - this.elapsed * (0.018 + this.absorbStrength * 0.18);
     this.stars.rotation.y += delta * (0.004 + this.absorbStrength * 0.025);
     this.starMaterial.uniforms.uTime.value = this.elapsed;
 
