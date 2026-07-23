@@ -1,4 +1,4 @@
-import { createBlackHoleScene } from "./black-hole-3d.js";
+import { createBlackHoleScene } from "./black-hole-3d.js?v=20260723-redesign3";
 
 const canvas = document.querySelector("#signal-canvas");
 const blackHole = createBlackHoleScene(canvas);

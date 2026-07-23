@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
-  --hole-x: 64%;
-  --hole-y: 40%;
+  --hole-x: 69%;
+  --hole-y: 42%;
   --bg: #030305;
   --panel: rgba(10, 10, 17, 0.58);
   --panel-strong: rgba(14, 13, 22, 0.74);
@@ -98,7 +98,6 @@ a {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
   padding: 18px 0;
-  backdrop-filter: blur(18px);
 }
 
 .site-header,
@@ -180,7 +179,7 @@ main {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 284px;
+  grid-template-columns: minmax(0, 640px) 1fr;
   align-items: center;
   gap: 42px;
   min-height: 74vh;
@@ -224,6 +223,7 @@ h1 {
   color: #dfd7e9;
   font-size: 1.14rem;
   line-height: 1.8;
+  text-shadow: 0 2px 18px #000, 0 0 32px #000;
 }
 
 .hero-actions {
@@ -278,8 +278,7 @@ h1 {
 }
 
 .hero-status {
-  display: grid;
-  gap: 10px;
+  display: none;
 }
 
 .hero-status div {
@@ -645,8 +644,8 @@ body.absorbing #signal-canvas {
 
 @media (max-width: 560px) {
   :root {
-    --hole-x: 62%;
-    --hole-y: 29%;
+    --hole-x: 72%;
+    --hole-y: 30%;
   }
 
   .nav-links {
