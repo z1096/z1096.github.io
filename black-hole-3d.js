@@ -128,6 +128,7 @@ const GLOW_FRAGMENT_SHADER = `
 const PARTICLE_VERTEX_SHADER = `
   uniform float uTime;
   uniform float uAbsorb;
+  uniform float uSizeScale;
   attribute float aRadius;
   attribute float aAngle;
   attribute float aSpeed;
@@ -150,25 +151,32 @@ const PARTICLE_VERTEX_SHADER = `
     );
     vec4 viewPosition = modelViewMatrix * vec4(transformed, 1.0);
     gl_Position = projectionMatrix * viewPosition;
-    gl_PointSize = aSize * (94.0 / max(1.0, -viewPosition.z)) * (1.0 + uAbsorb * 0.42);
+    float pulse = 0.74 + sin(uTime * (1.8 + aSpeed) + aPhase * 6.2831853) * 0.26;
+    gl_PointSize = aSize * uSizeScale * (94.0 / max(1.0, -viewPosition.z)) * (1.0 + uAbsorb * 0.42);
     vHeat = aHeat;
-    vAlpha = (0.44 + aHeat * 0.5) * (1.0 - pull * 0.42);
+    vAlpha = (0.44 + aHeat * 0.5) * (1.0 - pull * 0.42) * pulse;
   }
 `;
 
 const PARTICLE_FRAGMENT_SHADER = `
+  uniform float uOpacity;
+  uniform float uBloomMix;
   varying float vHeat;
   varying float vAlpha;
 
   void main() {
     float distanceToCenter = length(gl_PointCoord - vec2(0.5));
-    float alpha = smoothstep(0.5, 0.04, distanceToCenter) * vAlpha;
+    float edgeMask = 1.0 - smoothstep(0.34, 0.5, distanceToCenter);
+    float hotCore = 1.0 - smoothstep(0.035, 0.2, distanceToCenter);
+    float softGlow = exp(-distanceToCenter * distanceToCenter * 8.5) * edgeMask;
+    float particleShape = mix(hotCore + softGlow * 0.34, softGlow, uBloomMix);
+    float alpha = particleShape * vAlpha * uOpacity;
     vec3 ember = vec3(0.95, 0.08, 0.005);
     vec3 gold = vec3(1.0, 0.56, 0.09);
     vec3 whiteHot = vec3(1.0, 0.94, 0.7);
     vec3 color = mix(ember, gold, vHeat);
     color = mix(color, whiteHot, pow(vHeat, 3.0) * 0.72);
-    gl_FragColor = vec4(color, alpha);
+    gl_FragColor = vec4(color * (1.0 + hotCore * (1.0 - uBloomMix) * 0.75), alpha);
   }
 `;
 
@@ -498,7 +506,7 @@ class BlackHoleScene {
   }
 
   buildDiskParticles() {
-    const count = 660;
+    const count = 760;
     const geometry = new THREE.BufferGeometry();
     const radii = new Float32Array(count);
     const angles = new Float32Array(count);
@@ -510,10 +518,10 @@ class BlackHoleScene {
     const placeholders = new Float32Array(count * 3);
 
     for (let index = 0; index < count; index += 1) {
-      radii[index] = 1.78 + Math.pow(this.random(), 1.55) * 7.4;
+      radii[index] = 1.78 + Math.pow(this.random(), 1.72) * 7.4;
       angles[index] = this.random() * TAU;
       speeds[index] = 0.35 + this.random() * 1.15;
-      sizes[index] = 0.34 + this.random() * 1.3;
+      sizes[index] = 0.36 + Math.pow(this.random(), 2.35) * 2.6;
       heights[index] = (this.random() - 0.5) * 0.42;
       phases[index] = this.random();
       heats[index] = Math.max(0, 1 - (radii[index] - 1.78) / 7.4) * 0.72 + this.random() * 0.28;
@@ -528,22 +536,36 @@ class BlackHoleScene {
     geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
     geometry.setAttribute("aHeat", new THREE.BufferAttribute(heats, 1));
 
-    const material = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uAbsorb: { value: 0 } },
-      vertexShader: PARTICLE_VERTEX_SHADER,
-      fragmentShader: PARTICLE_FRAGMENT_SHADER,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: true,
-    });
-    this.shaderMaterials.push(material);
+    const layers = [
+      { sizeScale: 4.15, opacity: 0.24, bloomMix: 1, renderOrder: 15 },
+      { sizeScale: 1.08, opacity: 1, bloomMix: 0.18, renderOrder: 16 },
+    ];
 
-    this.diskParticles = new THREE.Points(geometry, material);
-    this.diskParticles.frustumCulled = false;
-    this.diskParticles.renderOrder = 16;
-    this.disk.add(this.diskParticles);
+    this.diskParticleLayers = layers.map((layer) => {
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uAbsorb: { value: 0 },
+          uSizeScale: { value: layer.sizeScale },
+          uOpacity: { value: layer.opacity },
+          uBloomMix: { value: layer.bloomMix },
+        },
+        vertexShader: PARTICLE_VERTEX_SHADER,
+        fragmentShader: PARTICLE_FRAGMENT_SHADER,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: true,
+      });
+      this.shaderMaterials.push(material);
+
+      const particles = new THREE.Points(geometry, material);
+      particles.frustumCulled = false;
+      particles.renderOrder = layer.renderOrder;
+      this.disk.add(particles);
+      return particles;
+    });
   }
 
   buildEventHorizon() {
