@@ -21,6 +21,7 @@ const DISK_VERTEX_SHADER = `
   varying float vHeat;
   varying float vAlpha;
   varying float vSpriteAngle;
+  varying float vDoppler;
 
   const float TAU = 6.28318530718;
 
@@ -43,6 +44,7 @@ const DISK_VERTEX_SHADER = `
     float tangentY = -cos(angle) * 0.52;
     vSpriteAngle = atan(tangentY, tangentX) - 0.12;
     vHeat = min(1.0, aHeat + inward * 0.25);
+    vDoppler = cos(angle);
     vAlpha = (0.38 + aHeat * 0.62) * (0.76 + 0.24 * sin(uTime * (1.1 + aSpeed) + aPhase * 31.0));
     vAlpha *= smoothstep(0.0, 0.08, cycle) * (1.0 - smoothstep(0.84, 1.0, cycle));
   }
@@ -61,6 +63,7 @@ const RING_VERTEX_SHADER = `
   varying float vHeat;
   varying float vAlpha;
   varying float vSpriteAngle;
+  varying float vDoppler;
 
   void main() {
     float pulse = sin(aAngle * 9.0 - uTime * 2.2 + aPhase * 1.7);
@@ -72,6 +75,7 @@ const RING_VERTEX_SHADER = `
     gl_PointSize = aSize * uSizeScale * (94.0 / max(2.0, -viewPosition.z)) * (1.0 + uAbsorb * 0.5);
     vSpriteAngle = angle + 1.5707963;
     vHeat = aHeat;
+    vDoppler = cos(angle);
     float crown = 0.26 + abs(sin(angle)) * 0.74;
     vAlpha = (0.58 + aHeat * 0.42) * crown * (0.78 + pulse * 0.22);
   }
@@ -92,6 +96,7 @@ const LENS_BELT_VERTEX_SHADER = `
   varying float vHeat;
   varying float vAlpha;
   varying float vSpriteAngle;
+  varying float vDoppler;
 
   void main() {
     float cycle = fract(aPhase + uTime * aSpeed * (0.014 + uAbsorb * 0.1));
@@ -110,6 +115,7 @@ const LENS_BELT_VERTEX_SHADER = `
 
     vSpriteAngle = 0.0;
     vHeat = min(1.0, aHeat + inward * 0.18);
+    vDoppler = cos(angle);
     vAlpha = (0.56 + aHeat * 0.44) * (0.78 + 0.22 * sin(uTime * 1.8 + aPhase * 37.0));
     vAlpha *= smoothstep(0.0, 0.06, cycle) * (1.0 - smoothstep(0.88, 1.0, cycle));
   }
@@ -122,6 +128,7 @@ const PARTICLE_FRAGMENT_SHADER = `
   varying float vHeat;
   varying float vAlpha;
   varying float vSpriteAngle;
+  varying float vDoppler;
 
   void main() {
     vec2 local = gl_PointCoord - vec2(0.5);
@@ -141,10 +148,15 @@ const PARTICLE_FRAGMENT_SHADER = `
     vec3 amber = vec3(1.0, 0.36, 0.035);
     vec3 whiteHot = vec3(1.0, 0.96, 0.84);
     vec3 lensWhite = vec3(0.91, 0.94, 1.0);
+    vec3 blueShift = vec3(0.2, 0.58, 1.0);
+    vec3 redShift = vec3(1.0, 0.1, 0.012);
     vec3 color = mix(ember, orange, smoothstep(0.0, 0.48, vHeat));
     color = mix(color, amber, smoothstep(0.28, 0.78, vHeat));
     color = mix(color, whiteHot, smoothstep(0.72, 0.94, vHeat));
     color = mix(color, lensWhite, smoothstep(0.95, 1.0, vHeat) * 0.68);
+    color = mix(color, blueShift, smoothstep(0.12, 1.0, vDoppler) * 0.38);
+    color = mix(color, redShift, smoothstep(0.12, 1.0, -vDoppler) * 0.3);
+    color *= 0.78 + smoothstep(-1.0, 1.0, vDoppler) * 0.42;
     color *= 0.86 + core * (1.0 - uGlowMix) * 1.3;
 
     gl_FragColor = vec4(color, alpha);
@@ -155,29 +167,48 @@ const PARTICLE_FRAGMENT_SHADER = `
 
 const STAR_VERTEX_SHADER = `
   uniform float uTime;
+  uniform float uAbsorb;
+  uniform float uAspect;
+  uniform vec2 uHoleNdc;
   attribute float aSize;
   attribute float aPhase;
   attribute float aWarm;
   varying float vAlpha;
   varying float vWarm;
+  varying float vLens;
 
   void main() {
     vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_Position = projectionMatrix * viewPosition;
-    gl_PointSize = aSize * (64.0 / max(3.0, -viewPosition.z));
-    vAlpha = 0.46 + 0.36 * sin(uTime * (0.35 + aWarm) + aPhase * 29.0);
+    vec4 clipPosition = projectionMatrix * viewPosition;
+    vec2 ndc = clipPosition.xy / clipPosition.w;
+    vec2 delta = ndc - uHoleNdc;
+    vec2 metric = vec2(delta.x * uAspect, delta.y);
+    float radius = length(metric);
+    vec2 radial = metric / max(radius, 0.0001);
+    vec2 tangent = vec2(-radial.y, radial.x);
+    float lens = (1.0 - smoothstep(0.055, 0.62, radius)) * smoothstep(0.035, 0.1, radius);
+    vec2 bend = tangent * (0.016 + uAbsorb * 0.052) + radial * (0.022 + uAbsorb * 0.026);
+    ndc += vec2(bend.x / uAspect, bend.y) * lens;
+    clipPosition.xy = ndc * clipPosition.w;
+
+    gl_Position = clipPosition;
+    gl_PointSize = aSize * (64.0 / max(3.0, -viewPosition.z)) * (1.0 + lens * 1.8);
+    vAlpha = (0.46 + 0.36 * sin(uTime * (0.35 + aWarm) + aPhase * 29.0)) * (1.0 + lens * 0.9);
     vWarm = aWarm;
+    vLens = lens;
   }
 `;
 
 const STAR_FRAGMENT_SHADER = `
   varying float vAlpha;
   varying float vWarm;
+  varying float vLens;
 
   void main() {
     float distanceToCenter = length(gl_PointCoord - vec2(0.5));
     float alpha = (1.0 - smoothstep(0.08, 0.5, distanceToCenter)) * vAlpha;
     vec3 color = mix(vec3(0.76, 0.82, 0.94), vec3(1.0, 0.48, 0.11), vWarm);
+    color = mix(color, vec3(0.58, 0.78, 1.0), vLens * 0.72);
     gl_FragColor = vec4(color, alpha);
     #include <colorspace_fragment>
   }
@@ -199,6 +230,7 @@ class ParticleBlackHoleScene {
     this.elapsed = 0;
     this.absorbing = false;
     this.absorbStrength = 0;
+    this.shockwaveAge = Number.POSITIVE_INFINITY;
     this.pointer = new THREE.Vector2(0.5, 0.5);
     this.pointerActive = false;
     this.shaderMaterials = [];
@@ -228,6 +260,7 @@ class ParticleBlackHoleScene {
     this.buildEventHorizon();
     this.buildPhotonRing();
     this.buildLensingBelt();
+    this.buildShockwaves();
     this.resize();
     this.animate();
 
@@ -240,6 +273,7 @@ class ParticleBlackHoleScene {
   }
 
   setAbsorbing(value) {
+    if (value && !this.absorbing) this.shockwaveAge = 0;
     this.absorbing = value;
   }
 
@@ -265,6 +299,8 @@ class ParticleBlackHoleScene {
     const visibleWidth = visibleHeight * aspect;
     this.root.position.set((point.x - 0.5) * visibleWidth, (0.5 - point.y) * visibleHeight, 0);
     this.root.scale.setScalar(width < 720 ? 0.55 : 1.13);
+    this.starMaterial.uniforms.uAspect.value = aspect;
+    this.starMaterial.uniforms.uHoleNdc.value.set(point.x * 2 - 1, 1 - point.y * 2);
   }
 
   buildStars() {
@@ -290,7 +326,12 @@ class ParticleBlackHoleScene {
     geometry.setAttribute("aWarm", new THREE.BufferAttribute(warmth, 1));
 
     this.starMaterial = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 } },
+      uniforms: {
+        uTime: { value: 0 },
+        uAbsorb: { value: 0 },
+        uAspect: { value: 1 },
+        uHoleNdc: { value: new THREE.Vector2() },
+      },
       vertexShader: STAR_VERTEX_SHADER,
       fragmentShader: STAR_FRAGMENT_SHADER,
       transparent: true,
@@ -440,6 +481,33 @@ class ParticleBlackHoleScene {
     });
   }
 
+  buildShockwaves() {
+    const layers = [
+      { color: 0x8fd7ff, delay: 0, width: 0.055, opacity: 0.3 },
+      { color: 0xffc98c, delay: 0.16, width: 0.085, opacity: 0.2 },
+    ];
+
+    this.shockwaves = layers.map((layer, index) => {
+      const geometry = new THREE.RingGeometry(1.66, 1.66 + layer.width, 160);
+      const material = new THREE.MeshBasicMaterial({
+        color: layer.color,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      });
+      const wave = new THREE.Mesh(geometry, material);
+      wave.userData = layer;
+      wave.position.z = 0.56 + index * 0.01;
+      wave.renderOrder = 110 + index;
+      wave.visible = false;
+      this.root.add(wave);
+      return wave;
+    });
+  }
+
   animate() {
     const now = performance.now() * 0.001;
     const delta = Math.min(now - this.lastFrame, 0.04);
@@ -454,6 +522,7 @@ class ParticleBlackHoleScene {
     this.disk.rotation.z = -0.012;
     this.stars.rotation.y += delta * (0.004 + this.absorbStrength * 0.025);
     this.starMaterial.uniforms.uTime.value = this.elapsed;
+    this.starMaterial.uniforms.uAbsorb.value = this.absorbStrength;
 
     this.shaderMaterials.forEach((material) => {
       material.uniforms.uTime.value = this.elapsed;
@@ -462,8 +531,25 @@ class ParticleBlackHoleScene {
 
     const coreScale = 1 + this.absorbStrength * 0.045;
     this.core.scale.setScalar(coreScale);
+    this.animateShockwaves(delta);
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(() => this.animate());
+  }
+
+  animateShockwaves(delta) {
+    this.shockwaveAge += delta;
+
+    this.shockwaves.forEach((wave) => {
+      const progress = THREE.MathUtils.clamp((this.shockwaveAge - wave.userData.delay) / 1.25, 0, 1);
+      const active = progress > 0 && progress < 1;
+      wave.visible = active;
+      if (!active) return;
+
+      const eased = 1 - Math.pow(1 - progress, 3);
+      wave.scale.setScalar(1 + eased * 3.6);
+      wave.material.opacity = Math.sin(progress * Math.PI) * wave.userData.opacity * (1 - progress * 0.42);
+      wave.rotation.z = progress * 0.32;
+    });
   }
 }
 
