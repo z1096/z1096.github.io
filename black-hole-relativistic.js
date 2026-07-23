@@ -33,9 +33,6 @@ uniform sampler2D noise_texture;
 uniform vec3 disc_params;
 uniform float exposure;
 uniform float absorb_strength;
-uniform float scene_time;
-uniform vec2 resolution;
-uniform vec2 hole_ndc;
 in vec3 view_dir;
 layout(location = 0) out vec4 frag_color;
 
@@ -54,17 +51,8 @@ float Hash31(vec3 p3) {
   return fract((p3.x + p3.y) * p3.z);
 }
 
-vec3 RotateSky(vec3 dir) {
-  float angle = scene_time * (0.018 + absorb_strength * 0.045);
-  float sine = sin(angle);
-  float cosine = cos(angle);
-  return vec3(cosine * dir.x - sine * dir.y,
-              sine * dir.x + cosine * dir.y,
-              dir.z);
-}
-
 vec3 GalaxyColor(vec3 dir) {
-  vec3 n = normalize(RotateSky(dir));
+  vec3 n = normalize(dir);
   float band = exp(-pow(abs(n.z + 0.12 * sin(n.x * 7.0)), 2.0) * 34.0);
   float dust = Hash31(floor(n * 90.0));
   vec3 nebula = mix(vec3(0.002, 0.003, 0.009), vec3(0.018, 0.006, 0.025), band);
@@ -78,15 +66,14 @@ vec3 StarTextureColor(vec3 dir, float lod, out vec2 sub_position) {
 }
 
 vec3 StarColor(vec3 dir, float lensing_amplification_factor) {
-  vec3 n = normalize(RotateSky(dir));
+  vec3 n = normalize(dir);
   vec3 cell = floor(n * 720.0);
   float seed = Hash31(cell);
-  float star = smoothstep(0.9935, 1.0, seed);
-  float rare = smoothstep(0.9992, 1.0, Hash31(cell + 17.0));
-  float twinkle = 0.58 + 0.42 * sin(scene_time * (1.4 + seed * 2.2) + seed * 31.0);
+  float star = smoothstep(0.9962, 1.0, seed);
+  float rare = smoothstep(0.99955, 1.0, Hash31(cell + 17.0));
   float amplification = min(5.5, 0.7 + sqrt(max(lensing_amplification_factor, 0.0)) * 0.9);
   vec3 tint = mix(vec3(0.55, 0.72, 1.0), vec3(1.0, 0.72, 0.38), Hash31(cell + 4.0));
-  return tint * (star * 1.05 + rare * 4.2) * amplification * twinkle;
+  return tint * (star * 0.8 + rare * 3.4) * amplification;
 }
 
 vec3 Doppler(vec3 rgb, float doppler_factor) {
@@ -106,39 +93,9 @@ vec4 DiscColor(vec2 point, float time, bool top_side, float doppler_factor) {
   return vec4(color.rgb * disc_params.x * underside, color.a * disc_params.y);
 }
 
-vec3 FlowingStarlight() {
-  vec2 ndc = gl_FragCoord.xy / resolution * 2.0 - 1.0;
-  vec2 delta = ndc - hole_ndc;
-  delta.x *= resolution.x / resolution.y;
-  float radius = length(delta);
-  float angle = atan(delta.y, delta.x);
-  float orbitMask = smoothstep(0.3, 0.42, radius) *
-                    (1.0 - smoothstep(1.35, 1.85, radius));
-  float flow = 0.0;
-  float blueMix = 0.0;
-  for (int i = 0; i < 4; ++i) {
-    float layer = float(i);
-    float spiral = angle + log(max(radius, 0.08)) * (2.2 + layer * 0.72) -
-                   scene_time * (0.16 + layer * 0.045) * (1.0 + absorb_strength * 3.2);
-    float laneWave = max(cos(spiral * (5.0 + layer * 1.7) + layer * 2.1), 0.0);
-    float beadWave = max(cos(radius * (78.0 + layer * 13.0) -
-                             scene_time * (1.6 + layer * 0.42)), 0.0);
-    float lane = pow(laneWave, 62.0);
-    float bead = pow(beadWave, 72.0);
-    float shortTail = pow(laneWave, 82.0) * pow(beadWave, 20.0);
-    float flicker = 0.7 + 0.3 * sin(scene_time * (2.0 + layer * 0.37) + layer * 4.0);
-    flow += (lane * bead * 8.4 + shortTail * 0.9) * flicker;
-    blueMix += lane * bead * mod(layer, 2.0);
-  }
-  vec3 warm = vec3(1.0, 0.72, 0.34);
-  vec3 cool = vec3(0.36, 0.82, 1.35);
-  return mix(warm, cool, clamp(blueMix, 0.0, 1.0)) * flow * orbitMask * 1.65;
-}
-
 void main() {
   vec3 hdr = SceneColor(camera_position, p, k_s, e_tau, e_w, e_h, e_d, view_dir);
   float energy = max(hdr.r, max(hdr.g, hdr.b));
-  hdr += FlowingStarlight() * (1.0 - smoothstep(0.03, 0.38, energy));
   hdr += hdr * smoothstep(0.08, 1.8, energy) * (0.08 + absorb_strength * 0.1);
   vec3 mapped = vec3(1.0) - exp(-hdr * exposure);
   mapped = pow(max(mapped, 0.0), vec3(0.84));
@@ -214,7 +171,7 @@ class RelativisticBlackHole {
     this.uniforms = uniforms(gl, this.program, [
       "camera_size", "hole_ndc", "camera_position", "p", "k_s", "e_tau", "e_w", "e_h", "e_d",
       "ray_deflection_texture", "ray_inverse_radius_texture", "black_body_texture", "doppler_texture",
-      "noise_texture", "disc_params", "exposure", "absorb_strength", "scene_time", "resolution",
+      "noise_texture", "disc_params", "exposure", "absorb_strength",
     ]);
     this.quad = createQuad(gl);
     this.textures = createTextures(gl, assets);
@@ -300,8 +257,6 @@ class RelativisticBlackHole {
     gl.uniform3f(u.disc_params, 0.008 + this.absorbStrength * 0.004, 0.45, 2750);
     gl.uniform1f(u.exposure, 0.038 + this.absorbStrength * 0.018);
     gl.uniform1f(u.absorb_strength, this.absorbStrength);
-    gl.uniform1f(u.scene_time, this.viewTime);
-    gl.uniform2f(u.resolution, width, height);
     bind(gl, this.textures.deflection, 0, u.ray_deflection_texture, gl.TEXTURE_2D);
     bind(gl, this.textures.inverseRadius, 1, u.ray_inverse_radius_texture, gl.TEXTURE_2D);
     bind(gl, this.textures.blackBody, 2, u.black_body_texture, gl.TEXTURE_2D);
