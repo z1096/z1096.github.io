@@ -123,7 +123,7 @@ main,
 .section-heading,
 .project-card,
 .site-footer > * {
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
 }
 
 .brand {
@@ -486,8 +486,7 @@ h1 {
 .sinkable {
   backface-visibility: hidden;
   transform-origin: center;
-  transform-style: preserve-3d;
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
 }
 
 body.absorbing {
@@ -496,6 +495,18 @@ body.absorbing {
 
 body.absorbing .site-header {
   backdrop-filter: none;
+}
+
+body.absorbing::before,
+body.absorbing::after,
+body.absorbing .sinkable * {
+  animation-play-state: paused !important;
+}
+
+body.absorbing .project-card,
+body.absorbing .nav-links,
+body.absorbing .button {
+  box-shadow: none;
 }
 
 body.absorbing .sinkable {
@@ -510,12 +521,10 @@ body.absorbing #signal-canvas {
 @keyframes sink-into-hole {
   0% {
     opacity: 1;
-    filter: blur(0) brightness(1);
     transform: translate3d(0, 0, 0) rotate(0deg) rotateX(0deg) scale(1);
   }
   16% {
     opacity: 1;
-    filter: blur(0) brightness(1.06);
     transform:
       translate3d(var(--sink-pre-x), var(--sink-pre-y), 0)
       rotate(var(--sink-rotate-pre))
@@ -524,7 +533,6 @@ body.absorbing #signal-canvas {
   }
   44% {
     opacity: 0.96;
-    filter: blur(0.15px) brightness(1.16);
     transform:
       translate3d(var(--sink-mid-x), var(--sink-mid-y), 0)
       rotate(var(--sink-rotate-mid))
@@ -533,7 +541,6 @@ body.absorbing #signal-canvas {
   }
   72% {
     opacity: 0.76;
-    filter: blur(0.8px) brightness(1.48);
     transform:
       translate3d(var(--sink-near-x), var(--sink-near-y), 0)
       rotate(var(--sink-rotate-near))
@@ -542,7 +549,6 @@ body.absorbing #signal-canvas {
   }
   90% {
     opacity: 0.32;
-    filter: blur(3.8px) brightness(1.9);
     transform:
       translate3d(var(--sink-x), var(--sink-y), 0)
       rotate(var(--sink-rotate-late))
@@ -551,7 +557,6 @@ body.absorbing #signal-canvas {
   }
   100% {
     opacity: 0;
-    filter: blur(10px) brightness(2.4);
     transform:
       translate3d(var(--sink-x), var(--sink-y), 0)
       rotate(var(--sink-rotate))

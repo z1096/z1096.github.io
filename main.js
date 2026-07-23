@@ -1,4 +1,4 @@
-import { createBlackHoleScene } from "./black-hole-relativistic.js?v=20260723-relativistic2";
+import { createBlackHoleScene } from "./black-hole-relativistic.js?v=20260723-performance1";
 
 const canvas = document.querySelector("#signal-canvas");
 const blackHole = createBlackHoleScene(canvas);
@@ -46,8 +46,7 @@ function resetAbsorption() {
 
 function markSinkTargets(center) {
   const elements = sinkSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
-
-  elements.forEach((element, index) => {
+  const targets = elements.map((element, index) => {
     const rect = element.getBoundingClientRect();
     const elementCenterX = rect.left + rect.width / 2;
     const elementCenterY = rect.top + rect.height / 2;
@@ -61,6 +60,10 @@ function markSinkTargets(center) {
     const spin = side * (108 + Math.random() * 168);
     const tilt = side * (6 + Math.random() * 10);
 
+    return { element, dx, dy, curve, lift, delay, spin, tilt };
+  });
+
+  targets.forEach(({ element, dx, dy, curve, lift, delay, spin, tilt }) => {
     element.classList.add("sinkable");
     element.style.setProperty("--sink-pre-x", `${-dx * 0.035}px`);
     element.style.setProperty("--sink-pre-y", `${-dy * 0.025 - 8}px`);

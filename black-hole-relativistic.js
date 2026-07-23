@@ -186,7 +186,11 @@ class RelativisticBlackHole {
     const point = this.currentPoint();
     return { x: innerWidth * point.x, y: innerHeight * point.y };
   }
-  setAbsorbing(value) { this.absorbing = value; }
+  setAbsorbing(value) {
+    if (this.absorbing === value) return;
+    this.absorbing = value;
+    this.resize();
+  }
   setPointer(x, y) { this.pointer = { x, y }; this.pointerActive = true; }
   clearPointer() { this.pointerActive = false; }
 
@@ -197,7 +201,8 @@ class RelativisticBlackHole {
   }
 
   resize() {
-    const quality = innerWidth < 760 ? 0.8 : 0.68;
+    const baseQuality = innerWidth < 760 ? 0.8 : 0.68;
+    const quality = baseQuality * (this.absorbing ? 0.72 : 1);
     this.canvas.width = Math.max(1, Math.floor(innerWidth * quality));
     this.canvas.height = Math.max(1, Math.floor(innerHeight * quality));
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
