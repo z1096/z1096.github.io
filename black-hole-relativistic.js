@@ -96,7 +96,7 @@ vec4 DiscColor(vec2 point, float time, bool top_side, float doppler_factor) {
 void main() {
   vec3 hdr = SceneColor(camera_position, p, k_s, e_tau, e_w, e_h, e_d, view_dir);
   float energy = max(hdr.r, max(hdr.g, hdr.b));
-  hdr += hdr * smoothstep(0.08, 1.8, energy) * (0.16 + absorb_strength * 0.16);
+  hdr += hdr * smoothstep(0.08, 1.8, energy) * (0.08 + absorb_strength * 0.1);
   vec3 mapped = vec3(1.0) - exp(-hdr * exposure);
   mapped = pow(max(mapped, 0.0), vec3(0.84));
   frag_color = vec4(mapped, 1.0);
@@ -160,12 +160,13 @@ class RelativisticBlackHole {
     this.gl = gl;
     this.lastTime = performance.now() * 0.001;
     this.orbitTime = 0;
+    this.viewTime = 0;
     this.absorbing = false;
     this.absorbStrength = 0;
     this.pointer = { x: 0.5, y: 0.5 };
     this.pointerActive = false;
+    this.viewOffset = { x: 0, y: 0 };
     this.reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    this.frame = 0;
     this.program = createProgram(gl, VERTEX_SHADER, fragmentShader(assets));
     this.uniforms = uniforms(gl, this.program, [
       "camera_size", "hole_ndc", "camera_position", "p", "k_s", "e_tau", "e_w", "e_h", "e_d",
@@ -207,11 +208,15 @@ class RelativisticBlackHole {
     const delta = Math.min(0.05, Math.max(0, now - this.lastTime));
     this.lastTime = now;
     this.absorbStrength += ((this.absorbing ? 1 : 0) - this.absorbStrength) * Math.min(1, delta * 3.8);
-    if (!this.reducedMotion || this.frame === 0) {
-      this.orbitTime += delta * (1 + this.absorbStrength * 5.5);
-      this.draw();
-      this.frame += 1;
-    }
+    const pointerX = this.pointerActive ? this.pointer.x - 0.5 : 0;
+    const pointerY = this.pointerActive ? this.pointer.y - 0.5 : 0;
+    const viewEase = Math.min(1, delta * 2.4);
+    this.viewOffset.x += (pointerX - this.viewOffset.x) * viewEase;
+    this.viewOffset.y += (pointerY - this.viewOffset.y) * viewEase;
+    const motionScale = this.reducedMotion ? 0.55 : 1;
+    this.orbitTime += delta * (1 + this.absorbStrength * 5.5) * motionScale;
+    this.viewTime += delta * motionScale;
+    this.draw();
     requestAnimationFrame(this.render);
   }
 
@@ -222,23 +227,35 @@ class RelativisticBlackHole {
     const point = this.currentPoint();
     const fov = 50 - this.absorbStrength * 4;
     const focal = height / (2 * Math.tan((fov * Math.PI) / 360));
-    const theta = 1.47;
-    const radius = 18;
+    const theta = 1.4 + Math.sin(this.viewTime * 0.35) * 0.13 - this.viewOffset.y * 0.18;
+    const phi = this.viewTime * 0.035 + this.viewOffset.x * 0.16;
+    const radius = 18.5 + Math.sin(this.viewTime * 0.24) * 0.9;
     const sinTheta = Math.sin(theta);
     const cosTheta = Math.cos(theta);
+    const sinPhi = Math.sin(phi);
+    const cosPhi = Math.cos(phi);
+    const roll = Math.sin(this.viewTime * 0.4) * 0.14 + this.viewOffset.x * 0.16;
+    const sinRoll = Math.sin(roll);
+    const cosRoll = Math.cos(roll);
+    const rolledWx = -cosRoll * sinPhi - sinRoll * cosTheta * cosPhi;
+    const rolledWy = cosRoll * cosPhi - sinRoll * cosTheta * sinPhi;
+    const rolledWz = sinRoll * sinTheta;
+    const rolledHx = -cosRoll * cosTheta * cosPhi + sinRoll * sinPhi;
+    const rolledHy = -cosRoll * cosTheta * sinPhi - sinRoll * cosPhi;
+    const rolledHz = cosRoll * sinTheta;
     gl.useProgram(this.program);
     gl.bindVertexArray(this.quad);
     gl.uniform3f(u.camera_size, width / 2, height / 2, focal);
     gl.uniform2f(u.hole_ndc, point.x * 2 - 1, 1 - point.y * 2);
-    gl.uniform4f(u.camera_position, this.orbitTime * 16, radius, theta, 0);
-    gl.uniform3f(u.p, radius * sinTheta, 0, radius * cosTheta);
+    gl.uniform4f(u.camera_position, this.orbitTime * 3, radius, theta, phi);
+    gl.uniform3f(u.p, radius * sinTheta * cosPhi, radius * sinTheta * sinPhi, radius * cosTheta);
     gl.uniform4f(u.k_s, 1 / Math.sqrt(1 - 1 / radius), 0, 0, 0);
     gl.uniform3f(u.e_tau, 0, 0, 0);
-    gl.uniform3f(u.e_w, 0, 1, 0);
-    gl.uniform3f(u.e_h, -cosTheta, 0, sinTheta);
-    gl.uniform3f(u.e_d, sinTheta, 0, cosTheta);
-    gl.uniform3f(u.disc_params, 0.012 + this.absorbStrength * 0.006, 0.48, 2850);
-    gl.uniform1f(u.exposure, 0.05 + this.absorbStrength * 0.025);
+    gl.uniform3f(u.e_w, rolledWx, rolledWy, rolledWz);
+    gl.uniform3f(u.e_h, rolledHx, rolledHy, rolledHz);
+    gl.uniform3f(u.e_d, sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+    gl.uniform3f(u.disc_params, 0.008 + this.absorbStrength * 0.004, 0.45, 2750);
+    gl.uniform1f(u.exposure, 0.038 + this.absorbStrength * 0.018);
     gl.uniform1f(u.absorb_strength, this.absorbStrength);
     bind(gl, this.textures.deflection, 0, u.ray_deflection_texture, gl.TEXTURE_2D);
     bind(gl, this.textures.inverseRadius, 1, u.ray_inverse_radius_texture, gl.TEXTURE_2D);

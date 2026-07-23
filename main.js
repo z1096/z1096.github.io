@@ -1,4 +1,4 @@
-import { createBlackHoleScene } from "./black-hole-relativistic.js?v=20260723-relativistic1";
+import { createBlackHoleScene } from "./black-hole-relativistic.js?v=20260723-relativistic2";
 
 const canvas = document.querySelector("#signal-canvas");
 const blackHole = createBlackHoleScene(canvas);
