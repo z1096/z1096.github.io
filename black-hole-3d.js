@@ -1,189 +1,165 @@
 import * as THREE from "./vendor/three.module.min.js";
 
+const TAU = Math.PI * 2;
 const ABSORPTION_POINT = {
   desktop: { x: 0.69, y: 0.42 },
   mobile: { x: 0.72, y: 0.3 },
 };
 
-const IMAGE_FOCUS = new THREE.Vector2(0.697, 0.57);
-
-const VERTEX_SHADER = `
-  varying vec2 vUv;
-
-  void main() {
-    vUv = uv;
-    gl_Position = vec4(position.xy, 0.0, 1.0);
-  }
-`;
-
-const FRAGMENT_SHADER = `
-  precision highp float;
-
-  uniform sampler2D uSceneTexture;
-  uniform vec2 uResolution;
-  uniform vec2 uImageResolution;
-  uniform vec2 uImageFocus;
-  uniform float uSceneScale;
-  uniform vec2 uCenter;
-  uniform vec2 uPointer;
+const DISK_VERTEX_SHADER = `
   uniform float uTime;
   uniform float uAbsorb;
-  uniform float uTextureReady;
-  varying vec2 vUv;
+  uniform float uSizeScale;
+  attribute float aRadius;
+  attribute float aAngle;
+  attribute float aSpeed;
+  attribute float aHeight;
+  attribute float aSize;
+  attribute float aHeat;
+  attribute float aPhase;
+  attribute float aLayer;
+  varying float vHeat;
+  varying float vAlpha;
+  varying float vSpriteAngle;
 
   const float TAU = 6.28318530718;
 
-  float hash21(vec2 point) {
-    point = fract(point * vec2(123.34, 456.21));
-    point += dot(point, point + 45.32);
-    return fract(point.x * point.y);
+  void main() {
+    float cycle = fract(aPhase + uTime * aSpeed * (0.012 + uAbsorb * 0.09));
+    float pull = smoothstep(0.08, 0.96, cycle) * uAbsorb;
+    float radius = mix(aRadius, max(1.76, aRadius * 0.18), pull);
+    float angularVelocity = (0.15 + 1.35 / (radius + 1.1)) * aSpeed;
+    float angle = aAngle + uTime * angularVelocity * (1.0 + uAbsorb * 5.4) + pull * 6.2;
+    float turbulence = sin(angle * 3.0 + aPhase * TAU) * (0.028 + aLayer * 0.07);
+    float height = aHeight * (1.0 - pull * 0.72) + turbulence;
+    vec3 transformed = vec3(cos(angle) * radius, sin(angle) * radius, height);
+    vec4 viewPosition = modelViewMatrix * vec4(transformed, 1.0);
+    gl_Position = projectionMatrix * viewPosition;
+    gl_PointSize = aSize * uSizeScale * (90.0 / max(2.0, -viewPosition.z)) * (1.0 + uAbsorb * 0.46);
+
+    float tangentX = -sin(angle);
+    float tangentY = cos(angle) * 0.52;
+    vSpriteAngle = atan(tangentY, tangentX) - 0.12;
+    vHeat = aHeat;
+    vAlpha = (0.38 + aHeat * 0.62) * (0.76 + 0.24 * sin(uTime * (1.1 + aSpeed) + aPhase * 31.0));
+    vAlpha *= 1.0 - pull * 0.38;
   }
+`;
 
-  float valueNoise(vec2 point) {
-    vec2 cell = floor(point);
-    vec2 local = fract(point);
-    local = local * local * (3.0 - 2.0 * local);
-    return mix(
-      mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), local.x),
-      mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0, 1.0)), local.x),
-      local.y
-    );
-  }
-
-  float fbm(vec2 point) {
-    float value = 0.0;
-    float amplitude = 0.52;
-    mat2 turn = mat2(0.82, -0.57, 0.57, 0.82);
-
-    for (int octave = 0; octave < 4; octave += 1) {
-      value += valueNoise(point) * amplitude;
-      point = turn * point * 2.03 + 17.17;
-      amplitude *= 0.5;
-    }
-
-    return value;
-  }
-
-  mat2 rotate2d(float angle) {
-    float sine = sin(angle);
-    float cosine = cos(angle);
-    return mat2(cosine, -sine, sine, cosine);
-  }
-
-  float narrowThread(float phase, float sharpness) {
-    return pow(max(0.0, 1.0 - abs(sin(phase))), sharpness);
-  }
-
-  float starLayer(vec2 uv, float scale, float threshold, float seedOffset) {
-    vec2 grid = uv * scale;
-    vec2 cell = floor(grid);
-    vec2 local = fract(grid) - 0.5;
-    float seed = hash21(cell + seedOffset);
-    float radius = mix(0.035, 0.135, hash21(cell + 9.71));
-    float shape = 1.0 - smoothstep(radius * 0.24, radius, length(local));
-    float twinkle = 0.62 + 0.38 * sin(uTime * (0.8 + seed * 1.7) + seed * 29.0);
-    return step(threshold, seed) * shape * twinkle;
-  }
-
-  vec2 sceneTextureUv(vec2 screenUv) {
-    float screenAspect = uResolution.x / max(uResolution.y, 1.0);
-    float imageAspect = uImageResolution.x / max(uImageResolution.y, 1.0);
-    vec2 visibleImageSize = vec2(1.0);
-
-    if (screenAspect > imageAspect) {
-      visibleImageSize.y = imageAspect / screenAspect;
-    } else {
-      visibleImageSize.x = screenAspect / imageAspect;
-    }
-
-    return uImageFocus + (screenUv - uCenter) * visibleImageSize * uSceneScale;
-  }
-
-  vec3 sampleScene(vec2 screenUv) {
-    vec2 textureUv = sceneTextureUv(screenUv);
-    float inside = step(0.0, textureUv.x) * step(textureUv.x, 1.0);
-    inside *= step(0.0, textureUv.y) * step(textureUv.y, 1.0);
-    return texture2D(uSceneTexture, clamp(textureUv, 0.0, 1.0)).rgb * inside * uTextureReady;
-  }
+const RING_VERTEX_SHADER = `
+  uniform float uTime;
+  uniform float uAbsorb;
+  uniform float uSizeScale;
+  attribute float aRadius;
+  attribute float aAngle;
+  attribute float aSpeed;
+  attribute float aSize;
+  attribute float aHeat;
+  attribute float aPhase;
+  varying float vHeat;
+  varying float vAlpha;
+  varying float vSpriteAngle;
 
   void main() {
-    float aspect = uResolution.x / max(uResolution.y, 1.0);
-    vec2 pointerShift = (uPointer - 0.5) * vec2(0.018, 0.012);
-    vec2 center = uCenter + pointerShift;
-    vec2 point = vUv - center;
-    vec2 metricPoint = vec2(point.x * aspect, point.y);
-    float radius = length(metricPoint);
-    float angle = atan(metricPoint.y, metricPoint.x);
-    float time = uTime * (0.72 + uAbsorb * 2.4);
-    float influence = 1.0 - smoothstep(0.16, 0.98, radius);
-    float turbulence = fbm(vec2(angle * 2.6 - time * 0.08, radius * 12.0 + time * 0.045));
-    float rotation = sin(time * 0.31 + radius * 16.0) * 0.0036;
-    rotation += sin(angle * 5.0 - time * 0.23) * 0.0018;
-    rotation += uAbsorb * (0.035 + turbulence * 0.075);
-    rotation *= influence;
+    float pulse = sin(uTime * (0.5 + aSpeed) + aPhase * 23.0);
+    float radius = aRadius + pulse * 0.018 + uAbsorb * 0.08;
+    float angle = aAngle + uTime * aSpeed * (0.18 + uAbsorb * 1.4);
+    vec3 transformed = vec3(cos(angle) * radius, sin(angle) * radius * 1.045, 0.34);
+    vec4 viewPosition = modelViewMatrix * vec4(transformed, 1.0);
+    gl_Position = projectionMatrix * viewPosition;
+    gl_PointSize = aSize * uSizeScale * (94.0 / max(2.0, -viewPosition.z)) * (1.0 + uAbsorb * 0.5);
+    vSpriteAngle = angle + 1.5707963;
+    vHeat = aHeat;
+    vAlpha = (0.58 + aHeat * 0.42) * (0.76 + pulse * 0.24);
+  }
+`;
 
-    float breathing = 1.0 + sin(time * 0.43) * 0.0025 - uAbsorb * influence * 0.025;
-    vec2 warpedMetric = rotate2d(rotation) * metricPoint * breathing;
-    vec2 warpedUv = center + vec2(warpedMetric.x / aspect, warpedMetric.y);
-    vec3 base = sampleScene(warpedUv);
+const PARTICLE_FRAGMENT_SHADER = `
+  uniform float uOpacity;
+  uniform float uGlowMix;
+  uniform float uStreak;
+  varying float vHeat;
+  varying float vAlpha;
+  varying float vSpriteAngle;
 
-    float echoRotation = rotation - (0.0025 + uAbsorb * 0.018) * influence;
-    vec2 echoMetric = rotate2d(echoRotation) * metricPoint * (breathing + 0.0025);
-    vec2 echoUv = center + vec2(echoMetric.x / aspect, echoMetric.y);
-    vec3 echo = sampleScene(echoUv);
-    float baseLuma = dot(base, vec3(0.2126, 0.7152, 0.0722));
-    vec3 color = max(base, echo * (0.62 + baseLuma * 0.26));
+  void main() {
+    vec2 local = gl_PointCoord - vec2(0.5);
+    float sine = sin(-vSpriteAngle);
+    float cosine = cos(-vSpriteAngle);
+    vec2 aligned = mat2(cosine, -sine, sine, cosine) * local;
+    float distanceToCenter = length(vec2(aligned.x / uStreak, aligned.y) * 2.0);
+    float edge = 1.0 - smoothstep(0.28, 1.0, distanceToCenter);
+    float core = 1.0 - smoothstep(0.0, 0.3, distanceToCenter);
+    float glow = exp(-distanceToCenter * distanceToCenter * 3.4) * edge;
+    float shape = mix(core + glow * 0.34, glow, uGlowMix);
+    float alpha = shape * vAlpha * uOpacity;
+    if (alpha < 0.004) discard;
 
-    float brightMatter = smoothstep(0.055, 0.72, baseLuma);
-    float lightPulse = 0.965 + 0.055 * sin(time * 1.2 + angle * 7.0 + turbulence * 5.0);
-    color *= mix(1.0, lightPulse + uAbsorb * 0.18, brightMatter);
+    vec3 ember = vec3(0.72, 0.018, 0.001);
+    vec3 orange = vec3(1.0, 0.16, 0.008);
+    vec3 amber = vec3(1.0, 0.36, 0.035);
+    vec3 whiteHot = vec3(1.0, 0.94, 0.69);
+    vec3 color = mix(ember, orange, smoothstep(0.0, 0.48, vHeat));
+    color = mix(color, amber, smoothstep(0.28, 0.78, vHeat));
+    color = mix(color, whiteHot, pow(vHeat, 16.0));
+    color *= 0.86 + core * (1.0 - uGlowMix) * 1.3;
 
-    float horizon = 0.196 + uAbsorb * 0.008;
-    float flowMask = smoothstep(horizon + 0.018, horizon + 0.13, radius);
-    flowMask *= 1.0 - smoothstep(0.62, 1.05, radius);
-    float thread = narrowThread(angle * 29.0 - log(radius + 0.03) * 22.0 - time * 1.8 + turbulence * 8.0, 27.0);
-    float fineThread = narrowThread(angle * 47.0 - radius * 38.0 - time * 2.5 + turbulence * 11.0, 36.0);
-    float threadEnergy = flowMask * (thread * 0.075 + fineThread * 0.045) * (1.0 + uAbsorb * 1.8);
-    color += vec3(1.0, 0.29, 0.025) * threadEnergy;
+    gl_FragColor = vec4(color, alpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`;
 
-    float photonRim = exp(-abs(radius - (horizon + 0.014 + (turbulence - 0.5) * 0.008)) * 105.0);
-    float rimFlicker = 0.66 + 0.34 * narrowThread(angle * 17.0 - time * 1.7 + turbulence * 7.0, 8.0);
-    color += vec3(1.0, 0.47, 0.08) * photonRim * rimFlicker * (0.08 + uAbsorb * 0.2);
+const STAR_VERTEX_SHADER = `
+  uniform float uTime;
+  attribute float aSize;
+  attribute float aPhase;
+  attribute float aWarm;
+  varying float vAlpha;
+  varying float vWarm;
 
-    float polarSparks = starLayer(vec2(angle / TAU + 0.5 + time * 0.002, radius), 176.0, 0.978, 14.3);
-    float sparkMask = smoothstep(horizon + 0.025, horizon + 0.12, radius);
-    sparkMask *= 1.0 - smoothstep(0.52, 0.94, radius);
-    color += vec3(1.0, 0.56, 0.13) * polarSparks * sparkMask * (0.34 + uAbsorb * 0.58);
+  void main() {
+    vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * viewPosition;
+    gl_PointSize = aSize * (64.0 / max(3.0, -viewPosition.z));
+    vAlpha = 0.46 + 0.36 * sin(uTime * (0.35 + aWarm) + aPhase * 29.0);
+    vWarm = aWarm;
+  }
+`;
 
-    float holeMask = 1.0 - smoothstep(horizon - 0.007, horizon + 0.004, radius);
-    color *= 1.0 - holeMask;
-    color = max(color, vec3(1.0, 0.63, 0.19) * photonRim * 0.035);
+const STAR_FRAGMENT_SHADER = `
+  varying float vAlpha;
+  varying float vWarm;
 
-    float vignette = 1.0 - smoothstep(0.62, 1.08, length((vUv - 0.5) * vec2(0.78, 1.0)));
-    color *= 0.72 + vignette * 0.34;
-    gl_FragColor = vec4(color, 1.0);
+  void main() {
+    float distanceToCenter = length(gl_PointCoord - vec2(0.5));
+    float alpha = (1.0 - smoothstep(0.08, 0.5, distanceToCenter)) * vAlpha;
+    vec3 color = mix(vec3(0.76, 0.82, 0.94), vec3(1.0, 0.48, 0.11), vWarm);
+    gl_FragColor = vec4(color, alpha);
     #include <colorspace_fragment>
   }
 `;
 
 export function createBlackHoleScene(canvas) {
   try {
-    return new DynamicBlackHoleScene(canvas);
+    return new ParticleBlackHoleScene(canvas);
   } catch (error) {
-    console.warn("Falling back from the dynamic black hole:", error);
+    console.warn("Falling back from the particle black hole:", error);
     return createFallbackScene();
   }
 }
 
-class DynamicBlackHoleScene {
+class ParticleBlackHoleScene {
   constructor(canvas) {
     this.canvas = canvas;
     this.lastFrame = performance.now() * 0.001;
     this.elapsed = 0;
     this.absorbing = false;
     this.absorbStrength = 0;
-    this.pointerTarget = new THREE.Vector2(0.5, 0.5);
-    this.pointerCurrent = new THREE.Vector2(0.5, 0.5);
+    this.pointer = new THREE.Vector2(0.5, 0.5);
+    this.pointerActive = false;
+    this.shaderMaterials = [];
+    this.random = createSeededRandom(1096);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -191,58 +167,27 @@ class DynamicBlackHoleScene {
       antialias: false,
       powerPreference: "high-performance",
     });
-    this.renderer.setClearColor(0x000000, 1);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    this.renderer.setClearColor(0x010102, 1);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.65));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    this.uniforms = {
-      uSceneTexture: { value: null },
-      uResolution: { value: new THREE.Vector2(1, 1) },
-      uImageResolution: { value: new THREE.Vector2(1680, 944) },
-      uImageFocus: { value: IMAGE_FOCUS },
-      uSceneScale: { value: 1 },
-      uCenter: { value: new THREE.Vector2() },
-      uPointer: { value: this.pointerCurrent },
-      uTime: { value: 0 },
-      uAbsorb: { value: 0 },
-      uTextureReady: { value: 0 },
-    };
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
+    this.camera.position.set(0, 0, 14);
 
-    this.material = new THREE.ShaderMaterial({
-      uniforms: this.uniforms,
-      vertexShader: VERTEX_SHADER,
-      fragmentShader: FRAGMENT_SHADER,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false,
-    });
-    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
-    this.screen.frustumCulled = false;
-    this.scene.add(this.screen);
+    this.root = new THREE.Group();
+    this.scene.add(this.root);
 
-    this.loadTexture();
+    this.buildStars();
+    this.buildAccretionDisk();
+    this.buildEventHorizon();
+    this.buildPhotonRing();
     this.resize();
     this.animate();
-    window.addEventListener("resize", () => this.resize());
-  }
 
-  loadTexture() {
-    const texture = new THREE.TextureLoader().load(
-      "./assets/black-hole-reference.jpg",
-      (loadedTexture) => {
-        loadedTexture.colorSpace = THREE.SRGBColorSpace;
-        loadedTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        loadedTexture.magFilter = THREE.LinearFilter;
-        loadedTexture.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
-        this.uniforms.uImageResolution.value.set(loadedTexture.image.width, loadedTexture.image.height);
-        this.uniforms.uTextureReady.value = 1;
-      },
-      undefined,
-      (error) => console.warn("Unable to load the black hole texture:", error),
-    );
-    this.uniforms.uSceneTexture.value = texture;
+    window.addEventListener("resize", () => this.resize());
   }
 
   getAbsorptionPoint() {
@@ -255,21 +200,163 @@ class DynamicBlackHoleScene {
   }
 
   setPointer(x, y) {
-    this.pointerTarget.set(x, 1 - y);
+    this.pointer.set(x, y);
+    this.pointerActive = true;
   }
 
   clearPointer() {
-    this.pointerTarget.set(0.5, 0.5);
+    this.pointerActive = false;
   }
 
   resize() {
     const width = Math.max(window.innerWidth, 1);
     const height = Math.max(window.innerHeight, 1);
+    const aspect = width / height;
     const point = getResponsivePoint();
     this.renderer.setSize(width, height, false);
-    this.uniforms.uResolution.value.set(width, height);
-    this.uniforms.uCenter.value.set(point.x, 1 - point.y);
-    this.uniforms.uSceneScale.value = width < 720 ? 1.32 : 1;
+    this.camera.aspect = aspect;
+    this.camera.updateProjectionMatrix();
+
+    const visibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.position.z;
+    const visibleWidth = visibleHeight * aspect;
+    this.root.position.set((point.x - 0.5) * visibleWidth, (0.5 - point.y) * visibleHeight, 0);
+    this.root.scale.setScalar(width < 720 ? 0.9 : 1.13);
+  }
+
+  buildStars() {
+    const count = 1050;
+    const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    const phases = new Float32Array(count);
+    const warmth = new Float32Array(count);
+
+    for (let index = 0; index < count; index += 1) {
+      positions[index * 3] = (this.random() - 0.5) * 48;
+      positions[index * 3 + 1] = (this.random() - 0.5) * 28;
+      positions[index * 3 + 2] = -5 - this.random() * 36;
+      sizes[index] = 0.42 + Math.pow(this.random(), 5) * 2.1;
+      phases[index] = this.random();
+      warmth[index] = this.random() > 0.93 ? this.random() * 0.65 : 0;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+    geometry.setAttribute("aWarm", new THREE.BufferAttribute(warmth, 1));
+
+    this.starMaterial = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: STAR_VERTEX_SHADER,
+      fragmentShader: STAR_FRAGMENT_SHADER,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    this.stars = new THREE.Points(geometry, this.starMaterial);
+    this.stars.frustumCulled = false;
+    this.stars.renderOrder = 1;
+    this.scene.add(this.stars);
+  }
+
+  buildAccretionDisk() {
+    const count = 30000;
+    const geometry = createParticleGeometry(count);
+    const strands = 156;
+
+    for (let index = 0; index < count; index += 1) {
+      const outer = this.random() > 0.76;
+      const radius = outer
+        ? 5.2 + Math.pow(this.random(), 0.74) * 5.6
+        : 1.82 + Math.pow(this.random(), 1.55) * 5.5;
+      const strand = Math.floor(this.random() * strands);
+      const jitter = (this.random() + this.random() + this.random() - 1.5) * (outer ? 0.12 : 0.055);
+      const angle = (strand / strands) * TAU - radius * 0.8 + jitter;
+      const heat = Math.min(1, Math.max(0, 1 - (radius - 1.82) / 6.2) * 0.82 + this.random() * 0.2);
+      const heightSpread = 0.045 + radius * (outer ? 0.03 : 0.014);
+
+      geometry.attributes.aRadius.array[index] = radius;
+      geometry.attributes.aAngle.array[index] = angle;
+      geometry.attributes.aSpeed.array[index] = 0.58 + this.random() * 0.76;
+      geometry.attributes.aHeight.array[index] = (this.random() + this.random() - 1) * heightSpread;
+      geometry.attributes.aSize.array[index] = 0.22 + Math.pow(this.random(), 5) * 1.7 + heat * 0.22;
+      geometry.attributes.aHeat.array[index] = heat;
+      geometry.attributes.aPhase.array[index] = this.random();
+      geometry.attributes.aLayer.array[index] = outer ? 1 : 0;
+    }
+
+    const layers = [
+      { sizeScale: 2.8, opacity: 0.08, glowMix: 1, streak: 2.2, renderOrder: 8 },
+      { sizeScale: 1, opacity: 0.98, glowMix: 0.14, streak: 4.2, renderOrder: 9 },
+    ];
+
+    this.disk = new THREE.Group();
+    this.disk.rotation.x = 1.24;
+    this.disk.rotation.z = -0.12;
+    this.root.add(this.disk);
+
+    layers.forEach((layer) => {
+      const material = createParticleMaterial(DISK_VERTEX_SHADER, layer);
+      this.shaderMaterials.push(material);
+      const particles = new THREE.Points(geometry, material);
+      particles.frustumCulled = false;
+      particles.renderOrder = layer.renderOrder;
+      this.disk.add(particles);
+    });
+  }
+
+  buildEventHorizon() {
+    this.core = new THREE.Mesh(
+      new THREE.SphereGeometry(1.68, 80, 56),
+      new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 1,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    this.core.position.z = 0.26;
+    this.core.renderOrder = 80;
+    this.root.add(this.core);
+  }
+
+  buildPhotonRing() {
+    const count = 6500;
+    const geometry = createParticleGeometry(count);
+
+    for (let index = 0; index < count; index += 1) {
+      const upperCrown = this.random() < 0.35;
+      const angle = upperCrown ? this.random() * Math.PI : this.random() * TAU;
+      const radius = 1.72 + Math.pow(this.random(), 2.3) * 0.24;
+      const heat = 0.52 + this.random() * 0.4;
+
+      geometry.attributes.aRadius.array[index] = radius;
+      geometry.attributes.aAngle.array[index] = angle;
+      geometry.attributes.aSpeed.array[index] = 0.06 + this.random() * 0.14;
+      geometry.attributes.aHeight.array[index] = 0;
+      geometry.attributes.aSize.array[index] = 0.2 + Math.pow(this.random(), 4) * 1.15;
+      geometry.attributes.aHeat.array[index] = heat;
+      geometry.attributes.aPhase.array[index] = this.random();
+      geometry.attributes.aLayer.array[index] = 0;
+    }
+
+    const layers = [
+      { sizeScale: 3, opacity: 0.09, glowMix: 1, streak: 1.7, renderOrder: 90 },
+      { sizeScale: 1, opacity: 0.84, glowMix: 0.1, streak: 2.8, renderOrder: 91 },
+    ];
+
+    layers.forEach((layer) => {
+      const material = createParticleMaterial(RING_VERTEX_SHADER, layer);
+      this.shaderMaterials.push(material);
+      const particles = new THREE.Points(geometry, material);
+      particles.frustumCulled = false;
+      particles.renderOrder = layer.renderOrder;
+      this.root.add(particles);
+    });
   }
 
   animate() {
@@ -278,13 +365,59 @@ class DynamicBlackHoleScene {
     this.lastFrame = now;
     this.elapsed += delta;
     this.absorbStrength = THREE.MathUtils.damp(this.absorbStrength, this.absorbing ? 1 : 0, 4.2, delta);
-    this.pointerCurrent.x = THREE.MathUtils.damp(this.pointerCurrent.x, this.pointerTarget.x, 2.6, delta);
-    this.pointerCurrent.y = THREE.MathUtils.damp(this.pointerCurrent.y, this.pointerTarget.y, 2.6, delta);
-    this.uniforms.uTime.value = this.elapsed;
-    this.uniforms.uAbsorb.value = this.absorbStrength;
+
+    const pointerX = this.pointerActive ? (this.pointer.x - 0.5) * 0.15 : 0;
+    const pointerY = this.pointerActive ? (0.5 - this.pointer.y) * 0.08 : 0;
+    this.root.rotation.y = THREE.MathUtils.damp(this.root.rotation.y, pointerX, 2.7, delta);
+    this.root.rotation.x = THREE.MathUtils.damp(this.root.rotation.x, pointerY, 2.7, delta);
+    this.disk.rotation.z = -0.12 + this.elapsed * (0.018 + this.absorbStrength * 0.18);
+    this.stars.rotation.y += delta * (0.004 + this.absorbStrength * 0.025);
+    this.starMaterial.uniforms.uTime.value = this.elapsed;
+
+    this.shaderMaterials.forEach((material) => {
+      material.uniforms.uTime.value = this.elapsed;
+      material.uniforms.uAbsorb.value = this.absorbStrength;
+    });
+
+    const coreScale = 1 + this.absorbStrength * 0.045;
+    this.core.scale.setScalar(coreScale);
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(() => this.animate());
   }
+}
+
+function createParticleGeometry(count) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+  geometry.setAttribute("aRadius", new THREE.BufferAttribute(new Float32Array(count), 1));
+  geometry.setAttribute("aAngle", new THREE.BufferAttribute(new Float32Array(count), 1));
+  geometry.setAttribute("aSpeed", new THREE.BufferAttribute(new Float32Array(count), 1));
+  geometry.setAttribute("aHeight", new THREE.BufferAttribute(new Float32Array(count), 1));
+  geometry.setAttribute("aSize", new THREE.BufferAttribute(new Float32Array(count), 1));
+  geometry.setAttribute("aHeat", new THREE.BufferAttribute(new Float32Array(count), 1));
+  geometry.setAttribute("aPhase", new THREE.BufferAttribute(new Float32Array(count), 1));
+  geometry.setAttribute("aLayer", new THREE.BufferAttribute(new Float32Array(count), 1));
+  return geometry;
+}
+
+function createParticleMaterial(vertexShader, layer) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uAbsorb: { value: 0 },
+      uSizeScale: { value: layer.sizeScale },
+      uOpacity: { value: layer.opacity },
+      uGlowMix: { value: layer.glowMix },
+      uStreak: { value: layer.streak },
+    },
+    vertexShader,
+    fragmentShader: PARTICLE_FRAGMENT_SHADER,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: true,
+  });
 }
 
 function getResponsivePoint() {
@@ -300,5 +433,16 @@ function createFallbackScene() {
     setAbsorbing: () => {},
     setPointer: () => {},
     clearPointer: () => {},
+  };
+}
+
+function createSeededRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
 }
