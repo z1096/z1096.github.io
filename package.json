@@ -1,7 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "check": "node --check main.js && node --check black-hole-3d.js"
+    "check": "node --check main.js && node --check black-hole-3d.js && node --check black-hole-relativistic.js"
   },
   "dependencies": {
     "three": "^0.185.1"

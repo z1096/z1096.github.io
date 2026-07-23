@@ -223,6 +223,10 @@ export function createBlackHoleScene(canvas) {
   }
 }
 
+export function createParticleBlackHoleScene(canvas) {
+  return createBlackHoleScene(canvas);
+}
+
 class ParticleBlackHoleScene {
   constructor(canvas) {
     this.canvas = canvas;

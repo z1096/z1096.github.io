@@ -215,6 +215,7 @@ h1 {
   text-shadow:
     0 0 24px rgba(255, 197, 90, 0.3),
     0 0 70px rgba(255, 76, 18, 0.24);
+  mix-blend-mode: difference;
 }
 
 .hero-summary {

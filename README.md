@@ -17,7 +17,7 @@ Then open `http://127.0.0.1:4173/`.
 ## Tech
 
 - Static HTML/CSS/JavaScript
-- Three.js/WebGL for the animated 3D black hole background
+- Relativistic WebGL2 ray tracing with a Three.js particle fallback
 - CSS transforms for the click-to-absorb page module animation
 
 ## Check
@@ -35,3 +35,7 @@ Push the `main` branch to GitHub and enable Pages from:
 - Folder: `/ (root)`
 
 The project is static and has no build step. The browser loads the vendored Three.js module from `vendor/`.
+
+The relativistic shader is adapted from
+[`ebruneton/black_hole_shader`](https://github.com/ebruneton/black_hole_shader)
+under its BSD-3-Clause license. See `vendor/ebruneton-black-hole/LICENSE`.
