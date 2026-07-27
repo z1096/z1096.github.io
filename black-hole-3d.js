@@ -6,6 +6,10 @@ const ABSORPTION_POINT = {
   mobile: { x: 0.82, y: 0.2 },
 };
 
+function markReady() {
+  document.documentElement.classList.add("black-hole-ready");
+}
+
 const DISK_VERTEX_SHADER = `
   uniform float uTime;
   uniform float uAbsorb;
@@ -237,6 +241,7 @@ class ParticleBlackHoleScene {
     this.shockwaveAge = Number.POSITIVE_INFINITY;
     this.pointer = new THREE.Vector2(0.5, 0.5);
     this.pointerActive = false;
+    this.ready = false;
     this.shaderMaterials = [];
     this.random = createSeededRandom(1096);
 
@@ -537,6 +542,10 @@ class ParticleBlackHoleScene {
     this.core.scale.setScalar(coreScale);
     this.animateShockwaves(delta);
     this.renderer.render(this.scene, this.camera);
+    if (!this.ready) {
+      this.ready = true;
+      markReady();
+    }
     requestAnimationFrame(() => this.animate());
   }
 

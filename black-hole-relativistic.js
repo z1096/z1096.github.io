@@ -4,7 +4,7 @@
  * vendor/ebruneton-black-hole/LICENSE
  */
 
-import { createParticleBlackHoleScene } from "./black-hole-3d.js?v=20260723-cinematic3";
+import { createParticleBlackHoleScene } from "./black-hole-3d.js?v=20260727-fastload1";
 
 const ASSET_ROOT = "./vendor/ebruneton-black-hole";
 const POINTS = { desktop: { x: 0.69, y: 0.42 }, mobile: { x: 0.82, y: 0.2 } };
@@ -106,6 +106,10 @@ function responsivePoint() {
   return matchMedia("(max-width: 720px)").matches ? POINTS.mobile : POINTS.desktop;
 }
 
+function markReady() {
+  document.documentElement.classList.add("black-hole-ready");
+}
+
 export function createBlackHoleScene(canvas) {
   let renderer = null;
   const state = { absorbing: false, pointer: null };
@@ -146,10 +150,10 @@ class RelativisticBlackHole {
       fetchText(`${ASSET_ROOT}/definitions.glsl`),
       fetchText(`${ASSET_ROOT}/functions.glsl`),
       fetchText(`${ASSET_ROOT}/model.glsl`),
-      fetchFloats(`${ASSET_ROOT}/deflection.dat`),
+      fetchFloats(`${ASSET_ROOT}/deflection-256.dat`),
       fetchFloats(`${ASSET_ROOT}/inverse_radius.dat`),
       fetchFloats(`${ASSET_ROOT}/black_body.dat`),
-      fetchFloats(`${ASSET_ROOT}/doppler.dat`),
+      fetchFloats(`${ASSET_ROOT}/doppler-32.dat`),
       loadImage(`${ASSET_ROOT}/noise_texture.png`),
     ]);
     return new RelativisticBlackHole(canvas, gl, { definitions, functions, model, deflection, inverseRadius, blackBody, doppler, noise });
@@ -165,6 +169,7 @@ class RelativisticBlackHole {
     this.absorbStrength = 0;
     this.pointer = { x: 0.5, y: 0.5 };
     this.pointerActive = false;
+    this.ready = false;
     this.viewOffset = { x: 0, y: 0 };
     this.reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.program = createProgram(gl, VERTEX_SHADER, fragmentShader(assets));
@@ -268,6 +273,10 @@ class RelativisticBlackHole {
     bind(gl, this.textures.doppler, 3, u.doppler_texture, gl.TEXTURE_3D);
     bind(gl, this.textures.noise, 4, u.noise_texture, gl.TEXTURE_2D);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (!this.ready) {
+      this.ready = true;
+      markReady();
+    }
   }
 }
 
@@ -363,11 +372,12 @@ function floatTexture2D(gl, data, components) {
   return texture;
 }
 function createTextures(gl, a) {
+  const dopplerDimensions = a.doppler.subarray(0, 3);
   const doppler = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_3D, doppler);
   for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_3D, parameter, gl.LINEAR);
   for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, parameter, gl.CLAMP_TO_EDGE);
-  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB32F, 64, 32, 64, 0, gl.RGB, gl.FLOAT, a.doppler);
+  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB32F, ...dopplerDimensions, 0, gl.RGB, gl.FLOAT, a.doppler.subarray(3));
   const noise = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, noise);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);

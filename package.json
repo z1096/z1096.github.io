@@ -1,7 +1,10 @@
 {
   "type": "module",
   "scripts": {
-    "check": "node --check main.js && node --check black-hole-3d.js && node --check black-hole-relativistic.js"
+    "assets:optimize": "node scripts/optimize-black-hole-assets.mjs",
+    "assets:verify": "node scripts/verify-black-hole-assets.mjs",
+    "verify:fast-load": "node scripts/verify-fast-load.mjs",
+    "check": "node --check main.js && node --check black-hole-3d.js && node --check black-hole-relativistic.js && npm run assets:verify && npm run verify:fast-load"
   },
   "dependencies": {
     "three": "^0.185.1"

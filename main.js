@@ -1,4 +1,4 @@
-import { createBlackHoleScene } from "./black-hole-relativistic.js?v=20260723-performance1";
+import { createBlackHoleScene } from "./black-hole-relativistic.js?v=20260727-fastload1";
 
 const canvas = document.querySelector("#signal-canvas");
 const blackHole = createBlackHoleScene(canvas);

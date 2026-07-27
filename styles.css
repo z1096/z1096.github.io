@@ -83,8 +83,64 @@ a {
   inset: 0;
   width: 100%;
   height: 100%;
+  opacity: 0;
   pointer-events: none;
   z-index: 0;
+  transition: opacity 280ms ease;
+}
+
+#black-hole-placeholder {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at var(--hole-x) var(--hole-y), #000 0 6.5rem, rgba(0, 0, 0, 0.96) 7rem, transparent 9.6rem),
+    radial-gradient(ellipse 19rem 4rem at var(--hole-x) var(--hole-y), rgba(255, 244, 208, 0.94) 0, rgba(255, 174, 70, 0.58) 4%, rgba(255, 69, 12, 0.22) 22%, transparent 70%),
+    radial-gradient(circle at var(--hole-x) var(--hole-y), transparent 0 7.2rem, rgba(255, 184, 84, 0.3) 8rem, rgba(255, 72, 14, 0.1) 10rem, transparent 15rem);
+  filter: saturate(1.08);
+  transition: opacity 360ms ease;
+}
+
+#black-hole-placeholder::before,
+#black-hole-placeholder::after {
+  position: absolute;
+  left: var(--hole-x);
+  top: var(--hole-y);
+  border-radius: 50%;
+  content: "";
+}
+
+#black-hole-placeholder::before {
+  width: clamp(18rem, 38vw, 36rem);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 210, 130, 0.5);
+  box-shadow:
+    0 0 16px rgba(255, 227, 178, 0.4),
+    0 0 48px rgba(255, 126, 34, 0.28),
+    inset 0 0 24px rgba(255, 94, 18, 0.2);
+  opacity: 0.72;
+  transform: translate(-50%, -50%) rotate(-8deg) scaleY(0.31);
+}
+
+#black-hole-placeholder::after {
+  width: clamp(8.4rem, 16vw, 13.8rem);
+  aspect-ratio: 1;
+  background: #000;
+  box-shadow:
+    0 0 0 2px rgba(255, 237, 197, 0.64),
+    0 0 18px rgba(255, 218, 145, 0.68),
+    0 0 44px rgba(255, 105, 24, 0.34);
+  transform: translate(-50%, -50%);
+}
+
+html.black-hole-ready #signal-canvas {
+  opacity: 1;
+}
+
+html.black-hole-ready #black-hole-placeholder {
+  opacity: 0;
 }
 
 .site-header {
@@ -650,8 +706,8 @@ body.absorbing #signal-canvas {
 
 @media (max-width: 560px) {
   :root {
-    --hole-x: 72%;
-    --hole-y: 30%;
+    --hole-x: 82%;
+    --hole-y: 20%;
   }
 
   .nav-links {
